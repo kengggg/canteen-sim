@@ -1,5 +1,6 @@
 import type { Config } from '../config/schema';
 import * as A from './agents';
+import { checkInvariants } from './invariants';
 import { MINUTE_MS, STATES } from './metrics';
 import type { PairInput } from './pairmetrics';
 import { computeRunMetrics, type RunMetrics } from './runmetrics';
@@ -110,6 +111,10 @@ export interface Engine {
 
 const m = (mm: number) => mm / 1000;
 
+declare const __SIM_INVARIANTS__: boolean | undefined;
+/** Compile-time flag (spec §13.3): Vitest defines it; production builds do not. */
+const INVARIANTS = typeof __SIM_INVARIANTS__ !== 'undefined' && __SIM_INVARIANTS__;
+
 export class Sim implements Engine {
   readonly world: World;
   readonly layout: StaticLayout;
@@ -117,9 +122,12 @@ export class Sim implements Engine {
   private finalFolded = false;
   private cachedMetrics: RunMetrics | null = null;
   private viewBuf: View | null = null;
+  private readonly invEvery: number;
+  private processed = 0;
 
   constructor(cfg: Config, opts: EngineOpts = {}) {
     const w = (this.world = new World(cfg, opts));
+    this.invEvery = opts.invariantEvery ?? 1000;
     A.install(w);
     const L = w.pc.L;
     this.layout = {
@@ -185,6 +193,7 @@ export class Sim implements Engine {
       default: throw new Error(`unknown event type ${q.type}`);
     }
     w.version++;
+    if (INVARIANTS && ++this.processed % this.invEvery === 0) checkInvariants(w);
   }
 
   advanceTo(simMs: number): void {
@@ -226,6 +235,7 @@ export class Sim implements Engine {
     if (this.finalFolded) return;
     this.finalFolded = true;
     const w = this.world;
+    if (INVARIANTS) checkInvariants(w);
     w.st.flush(w.now);
     const r = (this.cachedMetrics = computeRunMetrics(w));
     for (const v of Object.values(r)) foldValue(w.hash, v);

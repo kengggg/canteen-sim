@@ -11,7 +11,7 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "lib": ["ES2022"],
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "tests", "vitest.config.ts"]
+  "include": ["src", "tests", "scripts", "vitest.config.ts", "vitest.sanity.config.ts"]
 }

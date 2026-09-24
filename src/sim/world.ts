@@ -40,6 +40,7 @@ export interface GroupState {
   mem: Memory | null;
   targetOf: Map<number, number>;
   committedTable: number;
+  joinedTable: number;
   commitMs: number;
   searcherFoodMs: number;
   patienceStamp: number;
@@ -58,6 +59,8 @@ export interface EngineOpts {
   seed?: number;
   reserveFraction?: number;
   trace?: (event: string, a: number, b: number, c: number) => void;
+  /** With __SIM_INVARIANTS__, check invariants after every n-th event (default 1000) and at the end. */
+  invariantEvery?: number;
 }
 
 /** All mutable state of one run, plus low-level helpers shared by the behaviour code. */
@@ -241,7 +244,7 @@ export class World {
         reserver: this.pop.reserveDraw[g] < this.fraction, mode: GM.FREE, fallback: false, claimed: false,
         claimer: -1, claimTable: -1, claimTargetTable: -1, claimTargetNode: -1, frozen: false, cutoffPassed: false,
         claimEndMs: -1, firstSide: 0, fill: [], fillIdx: 0, history: [], sumCache: null,
-        searcher: -1, searchers: [], mem: null, targetOf: new Map(), committedTable: -1, commitMs: -1,
+        searcher: -1, searchers: [], mem: null, targetOf: new Map(), committedTable: -1, joinedTable: -1, commitMs: -1,
         searcherFoodMs: -1, patienceStamp: 0, walkPending: false, pendingAsks: 0, walkedAway: false, walkAwayMs: -1,
         splitFeasible: false, sitStarted: 0, eatDone: 0, standLeft: 0,
       };

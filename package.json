@@ -6,10 +6,13 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src tests",
-    "typecheck": "tsc --noEmit"
+    "lint": "eslint src tests scripts",
+    "typecheck": "tsc --noEmit",
+    "test:sanity": "vitest run --config vitest.sanity.config.ts",
+    "bench": "vite-node scripts/bench.ts"
   },
   "devDependencies": {
+    "@types/node": "^22.20.4",
     "eslint": "^9.39.5",
     "fast-check": "^3.23.2",
     "typescript": "^5.9.3",

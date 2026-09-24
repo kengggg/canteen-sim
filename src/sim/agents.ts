@@ -533,6 +533,7 @@ function commit(w: World, G: GroupState, p: number, t: number, join: boolean): v
   const set = join ? chooseJoin(w.k, free, w.occMask[t] | w.heldMask[t], G.size, here) : chooseUnclaimed(w.k, free, G.size, here);
   const own = ownSeat(set, here);
   G.committedTable = t;
+  if (join) G.joinedTable = t;
   G.commitMs = w.now;
   G.walkPending = false;
   G.patienceStamp++;

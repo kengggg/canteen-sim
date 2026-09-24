@@ -1895,8 +1895,11 @@ Development is test-driven: every rule gets a failing test first.
 - **M/G/1 module test.** Poisson arrivals, infinite capacity, `ρ = 0.7`, lognormal service with CV 0.5. The mean wait
   over 10⁶ customers is within 5% of `λm²(1+c²)/(2(1−λm))`.
 - **Mechanism test (Reservation-friendly preset, 30 seeds).** People in groups that claimed a table in A have a lower
-  median food-to-seat time than the same people in B, and the paired 95% CI excludes 0. **No test asserts which
+  **mean** food-to-seat time than the same people in B, and the paired 95% CI excludes 0. **No test asserts which
   canteen wins any headline metric.**
+  - *Implementation finding (Plan 2):* the **median** does not drop (A − B ≈ +6 s). Claims succeed mostly early, at empty
+    tables visible from the entrance, which lie farther from the stalls than the tables the same groups find in B
+    off-peak. The search a claim avoids shows in the peak and the tail (mean A − B ≈ −7.5 s, 95% CI −9.8 to −5.2).
 
 ### 13.5 Common random numbers
 
