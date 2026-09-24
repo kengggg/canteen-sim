@@ -11,6 +11,18 @@ import { PropKit } from './props';
 import { readTokens, type SceneTokens } from './theme';
 
 export interface Rect { x: number; y: number; w: number; h: number }
+
+/** Dispose every geometry, material and texture a scene owns. */
+function disposeScene(scene: Scene): void {
+  scene.traverse((o) => {
+    const m = o as unknown as { geometry?: { dispose(): void }; material?: { dispose(): void; map?: { dispose(): void } | null } };
+    if (m.material) {
+      m.material.map?.dispose();
+      m.material.dispose();
+    }
+    if (m.geometry && (o as { isInstancedMesh?: boolean }).isInstancedMesh) (o as unknown as { dispose(): void }).dispose();
+  });
+}
 export type Pick = { side: 0 | 1; kind: 'person'; person: number } | { side: 0 | 1; kind: 'table'; table: number };
 
 interface Side {
@@ -49,6 +61,7 @@ export class CanteenRenderer {
     this.pixelRatio = Math.min(2, window.devicePixelRatio || 1);
     r.setPixelRatio(this.pixelRatio);
     this.tokens = readTokens();
+    this.loseExt = r.getContext().getExtension('WEBGL_lose_context');
   }
 
   /** Returns null when WebGL is unavailable (spec §11.10). Never logs errors. */
@@ -63,39 +76,48 @@ export class CanteenRenderer {
     }
   }
 
-  /** (Re)build both scenes for a layout and allocate dynamic meshes for `people.count` people (spec §11.2 Restart). */
+  /**
+   * (Re)build for a layout and allocate dynamic meshes for `people.count` people (spec §11.2 Restart). The static
+   * scenes are built once per layout and reused; only the per-run people and overlay layers are replaced.
+   */
   setup(L: StaticLayout, people: StaticPeople): void {
-    const sameLayout = this.layout !== null && JSON.stringify(this.layout.tables) === JSON.stringify(L.tables) && this.layout.stalls.length === L.stalls.length;
+    const sameLayout = this.layout !== null && this.sides.length === 2 && JSON.stringify(this.layout.tables) === JSON.stringify(L.tables) && JSON.stringify(this.layout.stalls) === JSON.stringify(L.stalls);
     for (const s of this.sides) {
+      s.scene.remove(s.people.group, s.overlay.group);
       s.people.dispose();
       s.overlay.dispose();
     }
     if (!sameLayout) {
+      for (const s of this.sides) disposeScene(s.scene);
       this.props?.dispose();
       this.atlas?.dispose();
       this.atlas = new LabelAtlas(PropKit.labelTexts(L), this.tokens.label);
       this.props = new PropKit(L, this.atlas);
-      this.orbits = [threeQuarter(L), threeQuarter(L)];
+      this.layout = L;
+      this.sides = [0, 1].map(() => {
+        const scene = new Scene();
+        scene.background = this.tokens.clear.clone();
+        scene.add(new HemisphereLight(0xffffff, 0x888888, 1.6));
+        const sun = new DirectionalLight(0xffffff, 1.1);
+        sun.position.set(L.W * 0.3, 40, L.H * 0.2);
+        scene.add(sun);
+        scene.add(this.props!.build());
+        return { scene, camera: new PerspectiveCamera(45, 1, 0.2, 400), people: null as unknown as PeopleLayer, overlay: null as unknown as OverlayLayer, follow: new SmoothFollow() };
+      });
+      this.setMode(this.mode === 'follow' ? 'threeQuarter' : this.mode);
     }
-    this.layout = L;
     const dark = this.isDark();
     this.props!.applyTheme(this.tokens, dark);
     this.people.applyTheme(this.tokens);
     this.overlays.applyTheme(this.tokens);
     this.groupColors = Array.from({ length: people.groupId.length }, (_, g) => new Color().setHSL((g * 0.618034) % 1, 0.55, dark ? 0.6 : 0.45));
-    this.sides = [0, 1].map(() => {
-      const scene = new Scene();
-      scene.background = this.tokens.clear.clone();
-      scene.add(new HemisphereLight(0xffffff, 0x888888, 1.6));
-      const sun = new DirectionalLight(0xffffff, 1.1);
-      sun.position.set(L.W * 0.3, 40, L.H * 0.2);
-      scene.add(sun);
-      scene.add(this.props!.build());
-      const p = new PeopleLayer(this.people, people.count);
-      const o = new OverlayLayer(this.overlays, L);
-      scene.add(p.group, o.group);
-      return { scene, camera: new PerspectiveCamera(45, 1, 0.2, 400), people: p, overlay: o, follow: new SmoothFollow() };
-    });
+    for (const s of this.sides) {
+      s.people = new PeopleLayer(this.people, people.count);
+      s.overlay = new OverlayLayer(this.overlays, L);
+      s.overlay.showTints = this.tints;
+      s.follow = new SmoothFollow();
+      s.scene.add(s.people.group, s.overlay.group);
+    }
   }
 
   private isDark(): boolean {
@@ -116,14 +138,28 @@ export class CanteenRenderer {
   }
 
   setMode(mode: CameraMode): void {
-    if (!this.layout || !this.orbits) return;
+    if (!this.layout) return;
     this.mode = mode;
-    if (mode === 'threeQuarter') this.orbits = [threeQuarter(this.layout), threeQuarter(this.layout)];
+    if (mode === 'threeQuarter' || !this.orbits) this.orbits = [threeQuarter(this.layout), threeQuarter(this.layout)];
     if (mode === 'topDown') this.orbits = [topDown(this.layout), topDown(this.layout)];
   }
 
+  /** Each canteen has its own orbit; linked cameras copy the view after every change (spec §11.3). */
   orbitFor(side: 0 | 1): Orbit {
-    return this.orbits![this.linked ? 0 : side];
+    return this.orbits![side];
+  }
+
+  /** After a user orbit/zoom/pan on `side`: copy yaw, pitch and distance (and the target, except in follow mode). */
+  syncFrom(side: 0 | 1): void {
+    if (!this.linked || !this.orbits) return;
+    const a = this.orbits[side], b = this.orbits[side === 0 ? 1 : 0];
+    b.yaw = a.yaw;
+    b.pitch = a.pitch;
+    b.dist = a.dist;
+    if (this.mode !== 'follow') {
+      b.tx = a.tx;
+      b.tz = a.tz;
+    }
   }
 
   /** Follow-mode targets: the centroid of the followed group's members still inside each canteen. */
@@ -137,7 +173,7 @@ export class CanteenRenderer {
     }
     if (n === 0) return false;
     s.follow.step(dtS, x / n, z / n, this.reducedMotion);
-    const o = this.orbitFor(side);
+    const o = this.orbits![side];
     o.tx = s.follow.x;
     o.tz = s.follow.z;
     return true;
@@ -194,8 +230,23 @@ export class CanteenRenderer {
     } else this.slowSince = -1;
   }
 
+  private tints = false;
   setSeatTints(on: boolean): void {
+    this.tints = on;
     for (const s of this.sides) s.overlay.showTints = on;
+  }
+
+  /** Test and diagnostics: GPU resource counts and camera state. */
+  diagnostics(): { info: { textures: number; geometries: number }; yaw: number; targets: [number, number, number, number] } {
+    const m = this.renderer.info.memory;
+    const o = this.orbits!;
+    return { info: { textures: m.textures, geometries: m.geometries }, yaw: o[0].yaw, targets: [o[0].tx, o[0].tz, o[1].tx, o[1].tz] };
+  }
+
+  /** WEBGL_lose_context, cached while the context is alive (it cannot be fetched after a loss). */
+  loseExt: { loseContext(): void; restoreContext(): void } | null = null;
+  restoreContext(): void {
+    this.loseExt?.restoreContext();
   }
 
   /** Analytic picking (spec §11.7): people take precedence over tables. */
@@ -228,6 +279,7 @@ export class CanteenRenderer {
     for (const s of this.sides) {
       s.people.dispose();
       s.overlay.dispose();
+      disposeScene(s.scene);
     }
     this.props?.dispose();
     this.atlas?.dispose();

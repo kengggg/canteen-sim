@@ -34,3 +34,11 @@ export function int(x: number | null | undefined): string {
 }
 
 export const pct = (x: number | null | undefined, digits = 1) => (x === null || x === undefined ? '—' : `${num(x, digits)}%`);
+
+/** Axis tick labels with "." decimals whatever the browser locale (uPlot's default uses Intl). */
+export function axisNumber(v: number): string {
+  if (!Number.isFinite(v)) return '';
+  const a = Math.abs(v);
+  const digits = a === 0 || a >= 10 ? 0 : a >= 1 ? 1 : a >= 0.1 ? 2 : 3;
+  return num(v, digits);
+}

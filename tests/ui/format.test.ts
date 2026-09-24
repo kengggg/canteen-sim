@@ -16,3 +16,8 @@ test('numbers use "." decimals and "," groups whatever the locale', () => {
   expect(int(1801)).toBe('1,801');
   expect(int(1234567)).toBe('1,234,567');
 });
+
+test('chart axis labels use "." decimals whatever the locale', async () => {
+  const { axisNumber } = await import('../../src/ui/format');
+  expect([0, 0.075, 0.3, 2.5, 600].map(axisNumber)).toEqual(['0', '0.075', '0.30', '2.5', '600']);
+});

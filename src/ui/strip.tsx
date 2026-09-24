@@ -4,7 +4,7 @@ import { pairMetrics } from '../sim/engine';
 import { stackedChart, token } from './charts';
 import { clock, num } from './format';
 import { ADVANTAGE_HELP, SEAT_LABELS, STRIP_CAPTION, STRIP_TITLE } from './labels';
-import { applied, controller, tick } from './store';
+import { applied, controller, themeGen, tick } from './store';
 
 const STACK = [5, 4, 3, 1, 2, 0];
 
@@ -87,7 +87,7 @@ function SeriesPanel({ side }: { side: 0 | 1 }) {
     chart.current?.destroy();
     chart.current = stackedChart(node, x.length ? x : [0], x.length ? layers : STACK.map(() => [0]), STACK.map((st) => token(`--seat-${st}`)), STACK.map((st) => SEAT_LABELS[st]), seats, (v) => clock(cfg.crowd.windowStart, v * 60_000), shade);
     return () => { chart.current?.destroy(); chart.current = null; };
-  }, [minutes, shade, table, controller.generation, document.documentElement.getAttribute('data-theme')]);
+  }, [minutes, shade, table, controller.generation, themeGen.value]);
 
   return (
     <figure class="series">

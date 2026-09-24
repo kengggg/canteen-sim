@@ -6,7 +6,7 @@ import type { BatchResult, MetricStat } from '../batch/runner';
 import { SEED_COUNTS, SWEEPABLE, reservationJobs, sensitivityJobs } from '../batch/sweep';
 import { fmt, fmtNonZero, sentence } from '../batch/wording';
 import { META_BY_ID } from '../config/meta';
-import { defaultConfig } from '../config/schema';
+import { defaultConfig, type Config } from '../config/schema';
 import { validate } from '../config/validate';
 import { MODEL_VERSION } from '../sim/version';
 import { batch, cancelBatch, perRunMs, startBatch, workerCount } from './batchrun';
@@ -16,7 +16,7 @@ import { EVIDENCE, evidenceBatch } from './evidence';
 import { num } from './format';
 import { CHART_CAPTION, MSG } from './labels';
 import { LoadReadout } from './settings';
-import { applied, copyText, evidenceOpen } from './store';
+import { applied, copyText, evidenceOpen, themeGen } from './store';
 
 const pctLabel = (f: number) => `${Math.round(f * 100)}%`;
 
@@ -78,7 +78,7 @@ function DiffChart({ r, m }: { r: BatchResult; m: MetricDef }) {
     if (!el.current || table) return;
     let u: uPlot | null = diffChart(el.current, pts.map((p) => (r.kind === 'reservation' ? p.x * 100 : p.x * (META_BY_ID.get(r.setting!)?.uiFactor ?? 1))), pts.map((p) => p.mean), pts.map((p) => p.lo), pts.map((p) => p.hi), (v) => (r.kind === 'reservation' ? `${v}%` : num(v, 2).replace(/\.?0+$/, '')), m.unit === '%' ? 'pp' : m.unit);
     return () => { u?.destroy(); u = null; };
-  }, [r, m.id, table]);
+  }, [r, m.id, table, themeGen.value]);
   return (
     <figure class="diff">
       <figcaption>
@@ -167,10 +167,10 @@ function Breakdowns({ r, at }: { r: BatchResult; at: number }) {
   );
 }
 
-function Csv({ r }: { r: BatchResult }) {
+function Csv({ r, cfg }: { r: BatchResult; cfg: Config }) {
   const [shown, setShown] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  const text = () => toCsv(r, applied.value, { model: MODEL_VERSION, sha: __BUILD_SHA__, exportedAt: new Date().toISOString() });
+  const text = () => toCsv(r, cfg, { model: MODEL_VERSION, sha: __BUILD_SHA__, exportedAt: new Date().toISOString() });
   return (
     <div class="csv row">
       {canDownload.value && (
@@ -183,7 +183,7 @@ function Csv({ r }: { r: BatchResult }) {
   );
 }
 
-function Results({ r, precomputed }: { r: BatchResult; precomputed: boolean }) {
+function Results({ r, precomputed, cfg }: { r: BatchResult; precomputed: boolean; cfg: Config }) {
   const xs = levelsOf(r);
   const head = r.kind === 'reservation' ? 1 : xs[xs.length - 1];
   const truncated = r.truncated.reduce((a, t) => a + t.count, 0);
@@ -207,7 +207,7 @@ function Results({ r, precomputed }: { r: BatchResult; precomputed: boolean }) {
         {shown.map((m) => <DiffChart key={m.id} r={r} m={m} />)}
       </div>
       <Breakdowns r={r} at={head} />
-      <Csv r={r} />
+      <Csv r={r} cfg={cfg} />
     </div>
   );
 }
@@ -224,7 +224,7 @@ export function BatchPanel() {
   const [check, setCheck] = useState<string | null>(null);
   const meta = META_BY_ID.get(setting)!;
   const jobsCount = kind === 'reservation' ? 5 * n : values.split(',').filter((s) => s.trim()).length * 2 * n;
-  const est = perRunMs.value ?? 450 * (cfg.crowd.totalPeople / 1800);
+  const est = perRunMs.value !== null ? perRunMs.value * (cfg.crowd.totalPeople / (b.cfg?.crowd.totalPeople ?? cfg.crowd.totalPeople)) : 450 * (cfg.crowd.totalPeople / 1800);
   const estS = Math.ceil((jobsCount * est) / 1000 / workerCount());
 
   const run = async () => {
@@ -232,17 +232,17 @@ export function BatchPanel() {
     setCheck(null);
     evidenceOpen.value = false;
     if (kind === 'reservation') {
-      await startBatch('reservation', reservationJobs(cfg, n), null);
+      await startBatch('reservation', reservationJobs(cfg, n), null, cfg);
       return;
     }
     const vs = values.split(',').map((s) => Number(s.trim()) / meta.uiFactor).filter((x) => Number.isFinite(x));
     const r = sensitivityJobs(cfg, n, setting, vs.map((x) => Math.round(x * 1e6) / 1e6));
     if ('error' in r) { setError(r.error); return; }
     if (r.warnings.length) setError(r.warnings.join(' '));
-    await startBatch('sensitivity', r.jobs, setting);
+    await startBatch('sensitivity', r.jobs, setting, cfg);
   };
   const recheck = async () => {
-    const res = await startBatch('reservation', reservationJobs(defaultConfig(), 30), null);
+    const res = await startBatch('reservation', reservationJobs(defaultConfig(), 30), null, defaultConfig());
     if (!res) return;
     const mismatches = res.runs.filter((x) => EVIDENCE.runs.find((e) => e.k === x.key)?.h !== x.hash);
     setCheck(mismatches.length === 0 ? MSG.allMatch(res.runs.length) : `${mismatches.length} of ${res.runs.length} runs differ: ${mismatches.slice(0, 5).map((x) => x.key).join(', ')}`);
@@ -256,7 +256,7 @@ export function BatchPanel() {
       <p class="muted">{MSG.batchSource(cfg.seed)}</p>
       {warnings.length > 0 && <ul class="warn-text">{warnings.map((w) => <li key={w.code}>{w.message}</li>)}</ul>}
       <LoadReadout cfg={cfg} />
-      <form class="picker" onSubmit={(e) => { e.preventDefault(); run(); }}>
+      <div class="picker">
         <fieldset>
           <legend class="eyebrow">Sweep</legend>
           <label for="kind-res"><input id="kind-res" type="radio" name="kind" checked={kind === 'reservation'} onChange={() => setKind('reservation')} /> Reservation sweep (0, 25, 50, 75, 100%)</label>
@@ -288,19 +288,19 @@ export function BatchPanel() {
             <button type="button" onClick={cancelBatch}>Cancel</button>
           </div>
         ) : (
-          <button type="submit" class="primary">Run batch</button>
+          <button type="button" class="primary" onClick={run}>Run batch</button>
         )}
-      </form>
+      </div>
       {error && <p class="error-text" role="alert">{error}</p>}
       {b.status === 'failed' && <p class="error-text" role="alert">{b.message}</p>}
       {check && <p class="precomputed" role="status">{check}</p>}
       {showEvidence ? (
         <>
           <button type="button" onClick={recheck} disabled={b.status === 'running'}>Re-run on this device to check</button>
-          <Results r={evidenceBatch()} precomputed />
+          <Results r={evidenceBatch()} precomputed cfg={defaultConfig()} />
         </>
       ) : b.result ? (
-        <Results r={b.result} precomputed={false} />
+        <Results r={b.result} precomputed={false} cfg={b.cfg ?? cfg} />
       ) : (
         b.status !== 'running' && <p class="muted">Run a batch to compare many paired lunches.</p>
       )}

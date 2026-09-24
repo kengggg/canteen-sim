@@ -1,5 +1,6 @@
 import uPlot from 'uplot';
 import 'uplot/dist/uPlot.min.css';
+import { axisNumber } from './format';
 
 /** Chart helpers (uPlot). Colours come from the CSS tokens so both themes read correctly. */
 export function token(name: string): string {
@@ -27,7 +28,7 @@ export function stackedChart(el: HTMLElement, x: number[], layers: number[][], c
     legend: { show: false },
     cursor: { drag: { x: false, y: false }, points: { show: false } },
     scales: { x: { time: false }, y: { range: [0, ymax] } },
-    axes: [{ ...axis(), values: (_u, vals) => vals.map((v) => fmtX(v)) }, { ...axis(), size: 44 }],
+    axes: [{ ...axis(), values: (_u, vals) => vals.map((v) => fmtX(v)) }, { ...axis(), size: 44, values: (_u, vals) => vals.map(axisNumber) }],
     series: [{}, ...order.map((k) => ({ label: names[k], stroke: colors[k], fill: colors[k], width: 0, points: { show: false } }))],
     hooks: shade
       ? {
@@ -56,7 +57,7 @@ export function diffChart(el: HTMLElement, x: number[], mean: (number | null)[],
     legend: { show: false },
     cursor: { drag: { x: false, y: false } },
     scales: { x: { time: false } },
-    axes: [{ ...axis(), values: (_u, vals) => vals.map((v) => fmtX(v)) }, { ...axis(), size: 52, label: unit, labelSize: 16 }],
+    axes: [{ ...axis(), values: (_u, vals) => vals.map((v) => fmtX(v)) }, { ...axis(), size: 52, label: unit, labelSize: 16, values: (_u, vals) => vals.map(axisNumber) }],
     series: [
       {},
       { label: 'hi', stroke: 'transparent', points: { show: false } },

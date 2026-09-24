@@ -53,6 +53,12 @@ export const notices = signal<string[]>(initial.notices);
 export const skipProgress = signal<number | null>(null);
 export const endCardOpen = signal(false);
 export const evidenceOpen = signal(false);
+/** Bumped whenever the effective theme may have changed (our toggle, the host's data-theme, the OS scheme). */
+export const themeGen = signal(0);
+/** True while a batch runs: live playback pauses and the A slider is disabled (spec §10.1). */
+export const batchRunning = signal(false);
+/** Called after the applied config changes, so views holding results for other settings can drop them. */
+export const appliedListeners: ((c: Config) => void)[] = [];
 
 /** Mutate the pending config immutably (marks the run dirty; applies on Restart). */
 export function editPending(fn: (c: Config) => void): void {
@@ -69,9 +75,24 @@ export function restart(): void {
   }
   controller.rebuild(pending.value);
   applied.value = cloneConfig(controller.applied);
+  for (const f of appliedListeners) f(applied.value);
   playing.value = false;
   endCardOpen.value = false;
   skipProgress.value = null;
+  tick.value++;
+}
+
+/**
+ * A-slider release (spec §11.1): restart from 0 with the same seed and the new fraction, applying pending drawer
+ * changes — unless they are blocked, in which case only the fraction changes.
+ */
+export function releaseSlider(percent: number): void {
+  editPending((c) => { c.reserve.percentA = percent / 100; });
+  const base = validation.value.blocking.length > 0 ? applied.value : pending.value;
+  if (base !== pending.value) note('Pending settings cannot run, so only the reservation share was applied.');
+  controller.setFraction(percent / 100, base);
+  applied.value = cloneConfig(controller.applied);
+  for (const f of appliedListeners) f(applied.value);
   tick.value++;
 }
 

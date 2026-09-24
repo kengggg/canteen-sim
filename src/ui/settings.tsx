@@ -99,11 +99,20 @@ function Sharing() {
   const [shown, setShown] = useState<string | null>(null);
   const [scenarioName, setScenarioName] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
+  const [, setVersion] = useState(0);
+  const bump = () => setVersion((v) => v + 1);
   const saved = (() => { try { return JSON.parse(storage.get('canteen-sim:scenarios') ?? '{}') as Record<string, string>; } catch { return {}; } })();
   const storageOk = storage.set('canteen-sim:probe', '1');
   const copy = async (text: string) => {
     if (await copyText(text)) { setMsg(MSG.copied); setShown(null); } else { setMsg(MSG.copyFailed); setShown(text); }
   };
+  const saveScenario = () => {
+    if (!scenarioName.trim()) return;
+    storage.set('canteen-sim:scenarios', JSON.stringify({ ...saved, [scenarioName.trim()]: settingsCode(pending.value) }));
+    setScenarioName('');
+    bump();
+  };
+  const inViewer = typeof (globalThis as { claude?: unknown }).claude !== 'undefined';
   const load = () => {
     const d = parseShared(code);
     if (!d.ok) { setErr(MSG.badCode); return; }
@@ -122,13 +131,13 @@ function Sharing() {
       <h3 class="eyebrow">Share and save</h3>
       <div class="row">
         <button type="button" onClick={() => copy(settingsCode(pending.value))}>Copy settings code</button>
-        <button type="button" onClick={() => copy(location.href.split('#')[0] + encodeHash(pending.value))}>Copy link</button>
+        {!inViewer && <button type="button" onClick={() => copy(location.href.split('#')[0] + encodeHash(pending.value))}>Copy link</button>}
       </div>
-      <form class="row" onSubmit={(e) => { e.preventDefault(); load(); }}>
+      <div class="row">
         <label for="load-code" class="sr-only">Settings code or link</label>
-        <input id="load-code" placeholder="Paste a settings code or link" value={code} onInput={(e) => setCode((e.target as HTMLInputElement).value)} />
-        <button type="submit">Load</button>
-      </form>
+        <input id="load-code" placeholder="Paste a settings code or link" value={code} onInput={(e) => setCode((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); load(); } }} />
+        <button type="button" onClick={load}>Load</button>
+      </div>
       {err && <p class="error-text" role="alert">{err}</p>}
       <div class="row">
         {canDownload.value && <button type="button" onClick={() => download('canteen-sim-settings.json', exportJson(pending.value), 'application/json')}>Download JSON</button>}
@@ -151,22 +160,17 @@ function Sharing() {
       <h3 class="eyebrow">Saved scenarios</h3>
       {storageOk ? (
         <>
-          <form class="row" onSubmit={(e) => {
-            e.preventDefault();
-            if (!scenarioName.trim()) return;
-            storage.set('canteen-sim:scenarios', JSON.stringify({ ...saved, [scenarioName.trim()]: settingsCode(pending.value) }));
-            setScenarioName('');
-          }}>
+          <div class="row">
             <label for="scenario-name" class="sr-only">Scenario name</label>
-            <input id="scenario-name" placeholder="Name this scenario" value={scenarioName} onInput={(e) => setScenarioName((e.target as HTMLInputElement).value)} />
-            <button type="submit">Save</button>
-          </form>
+            <input id="scenario-name" placeholder="Name this scenario" value={scenarioName} onInput={(e) => setScenarioName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveScenario(); } }} />
+            <button type="button" onClick={saveScenario}>Save</button>
+          </div>
           <ul class="scenarios">
             {Object.entries(saved).map(([name, c]) => (
               <li key={name}>
                 <span>{name}</span>
                 <button type="button" onClick={() => { const d = parseShared(c); if (d.ok) pending.value = applyValues(d.values, d.model).cfg; }}>Load</button>
-                <button type="button" onClick={() => { const n = { ...saved }; delete n[name]; storage.set('canteen-sim:scenarios', JSON.stringify(n)); setScenarioName(''); }}>Delete</button>
+                <button type="button" onClick={() => { const n = { ...saved }; delete n[name]; storage.set('canteen-sim:scenarios', JSON.stringify(n)); bump(); }}>Delete</button>
               </li>
             ))}
           </ul>

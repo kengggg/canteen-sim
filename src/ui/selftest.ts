@@ -8,6 +8,7 @@ import { MODEL_VERSION } from '../sim/version';
 import type { FromWorker } from '../batch/worker';
 import { workerCount } from './batchrun';
 import { applied } from './store';
+import { getFollowed, getRenderer } from './stage';
 
 type Win = Window & { __selftest?: Record<string, SelfTestResult & { consistent: boolean; worker: boolean }>; __selftestDone?: boolean; __canteen?: unknown };
 
@@ -61,6 +62,9 @@ export async function runSelfTest(status: (s: string) => void): Promise<void> {
 export function installTestHooks(): void {
   (window as Win).__canteen = {
     config: () => applied.value,
+    renderer: () => getRenderer()?.diagnostics() ?? null,
+    follow: () => getFollowed(),
+    loseContext: () => getRenderer()?.loseExt?.loseContext(),
     async batch(n: number, mode: 'auto' | 'fallback' = 'auto') {
       const jobs = reservationJobs(applied.value, n);
       const fallback = new SlicedExecutor();

@@ -7,11 +7,11 @@ import { evidenceSentence } from './evidence';
 import { clock, parseClock } from './format';
 import { APP_TITLE, ARIA, MSG } from './labels';
 import {
-  applied, controller, drawer, evidenceOpen, howto, pending, playing, restart, skipProgress, speed, theme, tick,
+  applied, batchRunning, controller, drawer, evidenceOpen, howto, pending, playing, restart, skipProgress, speed, theme, tick,
 } from './store';
 
 export function togglePlay(): void {
-  if (controller.bothDone) return;
+  if (controller.bothDone || batchRunning.value) return;
   controller.playing = !controller.playing;
   playing.value = controller.playing;
 }
@@ -30,7 +30,7 @@ function Skip() {
     tick.value++;
   };
   return (
-    <form class="skip" onSubmit={(e) => { e.preventDefault(); go(); }}>
+    <div class="skip" role="group" aria-label="Skip to">
       <label for="skip-to" class="sr-only">Skip to time</label>
       {busy ? (
         <>
@@ -39,11 +39,11 @@ function Skip() {
         </>
       ) : (
         <>
-          <input id="skip-to" class="num" inputMode="numeric" size={5} value={value} onInput={(e) => setValue((e.target as HTMLInputElement).value)} />
-          <button type="submit">Skip to</button>
+          <input id="skip-to" class="num" inputMode="numeric" size={5} value={value} onInput={(e) => setValue((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } }} />
+          <button type="button" onClick={go}>Skip to</button>
         </>
       )}
-    </form>
+    </div>
   );
 }
 
@@ -77,7 +77,7 @@ export function TopBar() {
           </select>
         </label>
         <div class="transport">
-          <button type="button" class="primary" aria-label={playing.value ? ARIA.pause : ARIA.play} onClick={togglePlay} disabled={controller.bothDone}>
+          <button type="button" class="primary" aria-label={playing.value ? ARIA.pause : ARIA.play} onClick={togglePlay} disabled={controller.bothDone || batchRunning.value}>
             {playing.value ? '❚❚ Pause' : '▶ Play'}
           </button>
           <button type="button" onClick={restart}>Restart</button>

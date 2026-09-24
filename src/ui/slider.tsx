@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks';
 import { sliderLabel } from './labels';
-import { applied, controller, editPending, pending, tick } from './store';
+import { applied, batchRunning, releaseSlider, tick } from './store';
 
 /**
  * The A slider (spec §11.1): dragging only updates the label; releasing restarts both canteens from time 0 with the
@@ -13,10 +13,7 @@ export function ASlider() {
   const p = drag ?? committed;
   const release = (v: number) => {
     setDrag(null);
-    editPending((c) => { c.reserve.percentA = v / 100; });
-    controller.setFraction(v / 100, pending.value);
-    applied.value = JSON.parse(JSON.stringify(controller.applied));
-    tick.value++;
+    releaseSlider(v);
   };
   return (
     <label class="aslider" for="slider-a">
@@ -28,6 +25,7 @@ export function ASlider() {
         max={100}
         step={5}
         value={p}
+        disabled={batchRunning.value}
         onInput={(e) => setDrag(Number((e.target as HTMLInputElement).value))}
         onChange={(e) => release(Number((e.target as HTMLInputElement).value))}
       />

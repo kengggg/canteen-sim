@@ -14,7 +14,7 @@ function SeatBar({ live, seats }: { live: Live; seats: number }) {
           const w = (100 * n) / seats;
           return n > 0 ? (
             <span key={s} class="seatbar-seg" style={{ width: `${w}%`, background: `var(--seat-${s})` }} title={`${SEAT_LABELS[s]}: ${n}`}>
-              {w > 9 ? <span class="seatbar-n num">{n}</span> : null}
+              {w > 9 ? <span class="seatbar-n num" style={s === 0 ? { color: 'var(--ink)' } : undefined}>{n}</span> : null}
             </span>
           ) : null;
         })}
