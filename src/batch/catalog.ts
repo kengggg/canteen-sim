@@ -6,6 +6,8 @@ import type { Better } from './stats';
 export interface MetricDef {
   id: string;
   label: string;
+  /** How the metric reads inside a result sentence (defaults to the label, lower-cased). */
+  phrase?: string;
   unit: string;
   /** Display value = stored value × scale. */
   scale: number;
@@ -20,10 +22,10 @@ export interface MetricDef {
 const r = (id: keyof RunMetrics, label: string, unit: string, better: Better | null, cls: MetricDef['cls'], help: string, scale = 1): MetricDef => ({ id, label, unit, scale, better, cls, run: id, help });
 
 export const CATALOG: MetricDef[] = [
-  r('walkAwayPct', 'Walk-aways', '%', 'lower', 'primary', 'People who gave up on a seat and left with takeaway, as a share of arrivals.'),
-  r('entranceToSeatMeanMin', 'Entrance to seat (or giving up)', 'min', 'lower', 'primary', 'Mean time from the entrance to sitting down, or to giving up, over everyone who arrived.'),
+  { ...r('walkAwayPct', 'Walk-aways', '%', 'lower', 'primary', 'People who gave up on a seat and left with takeaway, as a share of arrivals.'), phrase: 'the walk-away rate' },
+  { ...r('entranceToSeatMeanMin', 'Entrance to seat (or giving up)', 'min', 'lower', 'primary', 'Mean time from the entrance to sitting down, or to giving up, over everyone who arrived.'), phrase: 'the mean time from entrance to seat (or giving up)' },
   {
-    id: 'peakUtilization', label: 'Peak seat utilization', unit: '%', scale: 100, better: 'higher', cls: 'primary',
+    id: 'peakUtilization', label: 'Peak seat utilization', phrase: 'peak seat utilization', unit: '%', scale: 100, better: 'higher', cls: 'primary',
     pair: (pm, side) => (side === 'level' ? pm.p3Level : pm.p3Baseline),
     help: 'Share of seat-time with someone sitting, over the busiest hour of the pair.',
   },

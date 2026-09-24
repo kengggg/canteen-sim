@@ -14,13 +14,15 @@ export interface RunResult {
   metrics: RunMetrics;
   hash: number;
   pair: PairInput;
+  /** The run's effective reserve.shareMinEmpty (after any per-value clamp). */
+  shareMinEmpty: number;
 }
 
 /** One engine run to done. */
 export function runJob(job: Job): RunResult {
   const e = createEngine(job.cfg, { seed: job.seed, reserveFraction: job.fraction });
   e.advanceTo(Infinity);
-  return { key: job.key, seedIndex: job.seedIndex, seed: job.seed, fraction: job.fraction, value: job.value, metrics: e.metrics(), hash: e.runHash(), pair: e.pairInput() };
+  return { key: job.key, seedIndex: job.seedIndex, seed: job.seed, fraction: job.fraction, value: job.value, metrics: e.metrics(), hash: e.runHash(), pair: e.pairInput(), shareMinEmpty: job.cfg.reserve.shareMinEmpty };
 }
 
 export interface PairRecord { seedIndex: number; seed: number; fraction: number; value: number | null; pm: PairMetrics }
@@ -38,6 +40,19 @@ export interface MetricStat {
   meanB: number | null;
 }
 
+/** Paired statistics for one §7.5 breakdown cell (all lower-is-better: advantage = A − B). */
+export interface BreakdownStat {
+  fraction: number;
+  value: number | null;
+  metric: string;
+  a: (number | null)[];
+  b: (number | null)[];
+  adv: PairedStat;
+}
+export type CohortName = 'R' | 'N' | 'Rclaimed' | 'Rfallback';
+export const COHORT_METRICS = ['walkAwayPct', 'entranceToSeatMeanMin', 'entranceToSeatMedianMin', 'entranceToSeatP90Min', 'foodToSeatMeanMin'] as const;
+export const SIZE_METRICS = ['walkAwayPct', 'entranceToSeatMeanMin', 'foodToSeatMeanMin'] as const;
+
 export interface BatchResult {
   kind: 'reservation' | 'sensitivity';
   setting: string | null;
@@ -46,6 +61,8 @@ export interface BatchResult {
   runs: RunResult[];
   pairs: PairRecord[];
   stats: MetricStat[];
+  cohortStats: (BreakdownStat & { cohort: CohortName })[];
+  sizeStats: (BreakdownStat & { size: number })[];
   truncated: { fraction: number; value: number | null; count: number }[];
 }
 
@@ -66,6 +83,8 @@ export function aggregate(kind: BatchResult['kind'], jobs: Job[], results: RunRe
 
   const pairs: PairRecord[] = [];
   const stats: MetricStat[] = [];
+  const cohortStats: BatchResult['cohortStats'] = [];
+  const sizeStats: BatchResult['sizeStats'] = [];
   const truncated: BatchResult['truncated'] = [];
   for (const lv of levels) {
     const lvRuns = Array.from({ length: n }, (_, i) => find(lv.value, lv.fraction, i));
@@ -96,6 +115,30 @@ export function aggregate(kind: BatchResult['kind'], jobs: Job[], results: RunRe
         meanA: mean(a), meanB: mean(b),
       });
     }
+    // §7.5 breakdowns, with the same seed dropping.
+    const badAt = (i: number) => {
+      const A = lvRuns[i], B = find(lv.value, 0, i);
+      return !A || !B || A.metrics.truncated || B.metrics.truncated || !pms[i];
+    };
+    const cell = (metric: string, get: (i: number, side: 'level' | 'baseline') => number | null): BreakdownStat => {
+      const a: (number | null)[] = [], b: (number | null)[] = [];
+      for (let i = 0; i < n; i++) {
+        a.push(badAt(i) ? null : get(i, 'level'));
+        b.push(badAt(i) ? null : get(i, 'baseline'));
+      }
+      return { fraction: lv.fraction, value: lv.value, metric, a, b, adv: pairedStat(a.map((x, i) => advantage(x, b[i], 'lower'))) };
+    };
+    for (const cohort of ['R', 'N', 'Rclaimed', 'Rfallback'] as CohortName[]) {
+      for (const metric of COHORT_METRICS) cohortStats.push({ cohort, ...cell(metric, (i, side) => pms[i]!.cohorts[cohort][side][metric]) });
+    }
+    for (let size = 1; size <= 6; size++) {
+      for (const metric of SIZE_METRICS) {
+        sizeStats.push({ size, ...cell(metric, (i, side) => {
+          const r = side === 'level' ? lvRuns[i]! : find(lv.value, 0, i)!;
+          return r.metrics.bySize?.[size - 1]?.[metric] ?? null;
+        }) });
+      }
+    }
   }
-  return { kind, setting, n, levels, runs: results, pairs, stats, truncated };
+  return { kind, setting, n, levels, runs: results, pairs, stats, cohortStats, sizeStats, truncated };
 }

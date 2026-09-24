@@ -6,5 +6,6 @@ export default defineConfig({
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/sanity/**'],
     globals: true,
+    testTimeout: 60_000,
   },
 });

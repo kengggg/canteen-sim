@@ -43,12 +43,14 @@ export function channelYield(): Promise<void> {
 export class SlicedExecutor implements Executor {
   readonly kind = 'sliced';
   yields = 0;
-  constructor(private readonly opts: { sliceMs?: number; yieldFn?: () => Promise<void>; now?: () => number } = {}) {}
+  constructor(private readonly opts: { sliceMs?: number; yieldFn?: () => Promise<void>; now?: () => number; waitHidden?: () => Promise<void> } = {}) {}
 
   async run(jobs: Job[], onResult: (r: RunResult) => void, ctl: Control): Promise<void> {
     const slice = this.opts.sliceMs ?? 12;
     const yieldFn = this.opts.yieldFn ?? channelYield;
     const now = this.opts.now ?? (() => performance.now());
+    // While the page is hidden, wait on a slow timer instead of spinning on the message loop.
+    const waitHidden = this.opts.waitHidden ?? (() => new Promise<void>((resolve) => setTimeout(resolve, 250)));
     for (const j of jobs) {
       const e = createEngine(j.cfg, { seed: j.seed, reserveFraction: j.fraction });
       while (!e.done) {
@@ -57,9 +59,9 @@ export class SlicedExecutor implements Executor {
         while (!e.done && now() - t0 < slice) e.step(500);
         this.yields++;
         await yieldFn();
-        while (ctl.hidden?.() && !ctl.cancelled) await yieldFn();
+        while (ctl.hidden?.() && !ctl.cancelled) await waitHidden();
       }
-      onResult({ key: j.key, seedIndex: j.seedIndex, seed: j.seed, fraction: j.fraction, value: j.value, metrics: e.metrics(), hash: e.runHash(), pair: e.pairInput() });
+      onResult({ key: j.key, seedIndex: j.seedIndex, seed: j.seed, fraction: j.fraction, value: j.value, metrics: e.metrics(), hash: e.runHash(), pair: e.pairInput(), shareMinEmpty: j.cfg.reserve.shareMinEmpty });
     }
   }
 }

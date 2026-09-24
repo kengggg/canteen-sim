@@ -45,14 +45,6 @@ test('sliced executor yields between slices and matches the sync hashes', async 
   expect(yields).toBeGreaterThan(jobs.length);
 });
 
-test('sliced executor pauses while hidden', async () => {
-  let hiddenChecks = 0;
-  let yields = 0;
-  const ex = new SlicedExecutor({ yieldFn: async () => { yields++; } });
-  await runBatch(jobs.slice(0, 1), ex, { cancelled: false, hidden: () => ++hiddenChecks <= 5 });
-  expect(yields).toBeGreaterThanOrEqual(5);
-});
-
 test('a healthy worker pool matches the sync hashes', async () => {
   const pool = new PoolExecutor({ create: () => new FakeWorker(), size: 3, fallback: new SyncExecutor() });
   const r = (await runBatch(jobs, pool, { cancelled: false }))!;

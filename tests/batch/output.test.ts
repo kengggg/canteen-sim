@@ -10,16 +10,16 @@ test('clear-difference, no-difference and too-few sentences', () => {
   const m = METRIC_BY_ID.get('walkAwayPct')!;
   const clear = pairedStat([2, 3, 2.5, 3.5, 2, 3, 2.5, 3, 2, 3]);
   expect(sentence(m, 1, clear, { W: 10, T: 0, L: 0, n: 10 })).toBe(
-    `At 100% reservation, walk-aways was ${fmt(clear.mean!, m)} percentage points better under free flow (95% CI ${fmt(clear.lo!, m)} to ${fmt(clear.hi!, m)}) across 10 paired lunches. Free flow better in 10, tied in 0, reservation better in 0.`,
+    `At 100% reservation, the walk-away rate was ${fmt(clear.mean!, m)} percentage points better under free flow (95% CI ${fmt(clear.lo!, m)} to ${fmt(clear.hi!, m)}) across 10 paired lunches. Free flow better in 10, tied in 0, reservation better in 0.`,
   );
   const worse = pairedStat([-2, -3, -2.5, -3.5, -2, -3, -2.5, -3, -2, -3]);
   expect(sentence(m, 0.5, worse, { W: 0, T: 0, L: 10, n: 10 })).toContain('better under free flow'.replace('better', 'worse'));
   const unclear = pairedStat([1, -1, 2, -2, 0.5, -0.5, 1, -1, 0.1, -0.2]);
-  expect(sentence(m, 0.25, unclear, { W: 5, T: 0, L: 5, n: 10 })).toBe('At 25% reservation, these 10 lunches show no clear difference in walk-aways.');
+  expect(sentence(m, 0.25, unclear, { W: 5, T: 0, L: 5, n: 10 })).toBe('At 25% reservation, these 10 lunches show no clear difference in the walk-away rate.');
   const few = pairedStat([1, 2, 3]);
   expect(sentence(m, 1, few, { W: 3, T: 0, L: 0, n: 3 })).toBe(`At 100% reservation, 3 usable lunches are too few for an interval; mean difference ${fmt(2, m)} percentage points.`);
-  expect(sentence(m, 1, pairedStat(new Array(10).fill(0)), { W: 0, T: 10, L: 0, n: 10 })).toBe('At 100% reservation, walk-aways was identical in all 10 lunches.');
-  expect(sentence(m, 1, pairedStat(new Array(10).fill(1)), { W: 10, T: 0, L: 0, n: 10 })).toBe(`At 100% reservation, walk-aways was ${fmt(1, m)} percentage points better under free flow, the same in every lunch.`);
+  expect(sentence(m, 1, pairedStat(new Array(10).fill(0)), { W: 0, T: 10, L: 0, n: 10 })).toBe('At 100% reservation, the walk-away rate was identical in all 10 lunches.');
+  expect(sentence(m, 1, pairedStat(new Array(10).fill(1)), { W: 10, T: 0, L: 0, n: 10 })).toBe(`At 100% reservation, the walk-away rate was ${fmt(1, m)} percentage points better under free flow, the same in every lunch.`);
   const ties = pairedStat([0, 0, 0, 0, 0, 0, 1, 2, 3, 1, 2]);
   expect(sentence(m, 1, ties, { W: 5, T: 6, L: 0, n: 11 })).toMatch(/mostly ties — interval approximate/);
 });

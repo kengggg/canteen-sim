@@ -45,8 +45,7 @@ export function toCsv(b: BatchResult, cfg: Config, meta: { model: number; sha: s
   for (const r of b.runs) {
     const m = common('run', r.seedIndex, r.seed, r.fraction, r.value);
     m.set('runHash', r.hash);
-    const k2 = b.setting === 'layout.seatsPerSide' && r.value !== null ? 2 * Math.round(r.value) : 2 * cfg.layout.seatsPerSide;
-    m.set('effectiveShareMinEmpty', Math.min(cfg.reserve.shareMinEmpty, k2));
+    m.set('effectiveShareMinEmpty', r.shareMinEmpty ?? cfg.reserve.shareMinEmpty);
     for (const [k, v] of runColumns(r.metrics)) m.set(k, v);
     rows.push(m);
   }

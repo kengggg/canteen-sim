@@ -31,5 +31,5 @@ test('the shipped evidence is current: model version, size, and fresh runs repro
   expect(ev.pairs).toHaveLength(120);
   expect(ev.settings).toEqual(defaultConfig());
   const jobs = new Map(reservationJobs(defaultConfig(), 30).map((j) => [j.key, j]));
-  for (const r of [ev.runs[0], ev.runs[77], ev.runs[149]]) expect(runJob(jobs.get(r.k)!).hash).toBe(r.h);
+  for (const r of [ev.runs[0], ev.runs[40], ev.runs[77], ev.runs[110], ev.runs[149]]) expect(runJob(jobs.get(r.k)!).hash).toBe(r.h);
 }, 60_000);

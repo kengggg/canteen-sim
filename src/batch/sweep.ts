@@ -48,6 +48,17 @@ export function reservationJobs(cfg: Config, n: number): Job[] {
 export function sensitivityJobs(cfg: Config, n: number, setting: string, values: number[]): { jobs: Job[]; level: number; warnings: string[] } | { error: string } {
   if (!SWEEPABLE.some((m) => m.id === setting)) return { error: `${setting} cannot be swept.` };
   if (values.length < 3 || values.length > 6) return { error: 'Pick 3 to 6 values.' };
+  if (new Set(values).size !== values.length) return { error: 'Each value can appear only once.' };
+  const meta = SWEEPABLE.find((m) => m.id === setting)!;
+  for (const v of values) {
+    let lo = meta.min, hi = meta.max;
+    if (setting === 'crowd.windowEnd') { lo = cfg.crowd.windowStart + 30; hi = cfg.crowd.windowStart + 300; }
+    if (setting === 'crowd.peakTime') { lo = cfg.crowd.windowStart; hi = cfg.crowd.windowEnd; }
+    if (setting === 'reserve.shareMinEmpty') hi = 2 * cfg.layout.seatsPerSide;
+    const steps = (v - meta.min) / meta.step;
+    const onStep = Math.abs(steps - Math.round(steps)) < 1e-6;
+    if (!Number.isFinite(v) || v < lo || v > hi || !onStep) return { error: `The value ${v} for ${meta.label} is outside its range (${lo}–${hi}, step ${meta.step}).` };
+  }
   const level = cfg.reserve.percentA > 0 ? cfg.reserve.percentA : 1;
   const seeds = batchSeeds(cfg.seed, n);
   const jobs: Job[] = [];
