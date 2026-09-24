@@ -55,6 +55,15 @@ export class MiniSim {
     });
   }
 
+  /** Replace p's remaining path with `path` (starting at its current node) and move on. */
+  reroute(p: number, path: number[]): void {
+    this.paths[p] = path;
+    this.step[p] = 0;
+    this.arrivedAt[p] = [this.now];
+    this.done[p] = false;
+    this.next(p);
+  }
+
   /** Run a callback at ms (kind 1, before arrivals). */
   at(ms: number, fn: () => void): void {
     this.callbacks.push(fn);

@@ -30,6 +30,7 @@ export function groupArrive(w: World, g: number): void {
   }
   if (!G.reserver) {
     for (const p of members(G)) goBuy(w, p);
+    w.trace?.('arrive', g, 0, 0);
     return;
   }
   G.mode = GM.RESERVE;
@@ -53,6 +54,7 @@ export function groupArrive(w: World, g: number): void {
   w.setPhase(G.claimer, PH.CLAIMING);
   w.schedule(w.now + w.claimLimitMs, K.TIMER, w.pidOf(G.first), EV.CUTOFF, g);
   claimObserve(w, G.claimer, entrance);
+  w.trace?.('arrive', g, 0, 0);
 }
 
 function setClaiming(w: World, p: number, on: boolean): void {
@@ -148,6 +150,7 @@ export function edgeArrive(w: World, p: number): void {
   if (G.mode === GM.RESERVE && p === G.claimer) {
     if (w.together) {
       G.history.push(n);
+      w.trace?.('lead', G.g, n, 0);
       for (const f of members(G)) if (f !== p && w.phase[f] === PH.CONVOY && w.waitingLeader[f]) followerAdvance(w, f);
     }
     claimObserve(w, p, n);
@@ -162,6 +165,7 @@ export function edgeArrive(w: World, p: number): void {
 
 function followerArrive(w: World, f: number): void {
   w.histIdx[f]++;
+  w.trace?.('follow', w.pop.group[f], f, w.mv.node[f]);
   followerAdvance(w, f);
 }
 
@@ -216,7 +220,7 @@ function claimStep(w: World, p: number): void {
   if (G.frozen) {
     const t = G.claimTargetTable;
     if (mem.occMask[t] !== 0 || mem.claimed[t]) {
-      fallback(w, G);
+      fallback(w, G, 2);
       return;
     }
     if (n === G.claimTargetNode) claimCheck(w, p);
@@ -249,7 +253,7 @@ function claimCheck(w: World, p: number): void {
     return;
   }
   G.mem!.learn(t, w.occMask[t], w.heldMask[t], w.claimedBy[t] >= 0, w.now);
-  if (G.frozen) fallback(w, G);
+  if (G.frozen) fallback(w, G, 3);
   else claimStep(w, p);
 }
 
@@ -268,7 +272,6 @@ function claim(w: World, G: GroupState, t: number, n: number): void {
   G.firstSide = w.pc.G.nodes[n].hLine === w.pc.L.tables[t].row ? 0 : 1;
   G.fill = fillOrder(w.k, G.firstSide);
   G.fillIdx = 0;
-  w.trace?.('claim', G.g, t, n);
   const p = G.claimer;
   w.setPhase(p, PH.PLACING);
   w.mv.stop(p);
@@ -277,8 +280,9 @@ function claim(w: World, G: GroupState, t: number, n: number): void {
   // Members already holding food are assigned now, in (service end, person id) order.
   const fed = members(G).filter((m) => w.hasFood[m] && w.seat[m] < 0);
   fed.sort((a, b) => w.st.serviceEndMs[a] - w.st.serviceEndMs[b] || a - b);
+  for (const m of fed) assignReserverSeat(w, G, m);
+  w.trace?.('claim', G.g, t, n);
   for (const m of fed) {
-    assignReserverSeat(w, G, m);
     if (w.phase[m] === PH.WAIT_FOOD) {
       w.setStandingFood(m, false);
       goSeat(w, m);
@@ -294,6 +298,7 @@ function assignReserverSeat(w: World, G: GroupState, p: number): void {
 export function placeEnd(w: World, p: number): void {
   const G = w.groupOf(p);
   w.actionBusy(w.mv.node[p], -1);
+  w.trace?.('placeEnd', G.g, G.claimTable, w.mv.node[p]);
   if (w.together) {
     for (const m of members(G)) {
       setClaiming(w, m, false);
@@ -311,10 +316,11 @@ export function onCutoff(w: World, g: number): void {
   if (G.mode !== GM.RESERVE) return;
   G.cutoffPassed = true;
   if (G.claimTargetTable >= 0) G.frozen = true;
-  else fallback(w, G);
+  else fallback(w, G, 1);
 }
 
-function fallback(w: World, G: GroupState): void {
+/** Reasons: 1 no target at the cutoff, 2 frozen target seen taken, 3 frozen target taken on arrival. */
+function fallback(w: World, G: GroupState, reason: number): void {
   G.mode = GM.FREE;
   G.fallback = true;
   w.fallbackGroups++;
@@ -323,7 +329,7 @@ function fallback(w: World, G: GroupState): void {
   G.claimTargetTable = -1;
   G.claimTargetNode = -1;
   G.claimEndMs = w.now;
-  w.trace?.('fallback', G.g, 0, 0);
+  w.trace?.('fallback', G.g, reason, 0);
   if (w.together) {
     for (const m of members(G)) {
       setClaiming(w, m, false);
@@ -611,6 +617,7 @@ function sit(w: World, p: number): void {
   G.sitStarted++;
   if (G.claimed && G.claimTable === t && G.sitStarted === G.size) w.complete[t] = 1;
   w.recomputeTable(t);
+  w.trace?.('sit', G.g, s, 0);
   w.schedule(w.now + SIT_MS, K.ACTION, w.pidOf(p), EV.SIT_END, p);
 }
 
@@ -651,6 +658,8 @@ export function standEnd(w: World, p: number): void {
     w.claimedFlag[t] = 0;
     w.complete[t] = 0;
     w.claimSince[t] = -1;
+    w.recomputeTable(t);
+    w.trace?.('unclaim', G.g, t, 0);
   }
   w.recomputeTable(t);
   w.usedTray[p] = 1;

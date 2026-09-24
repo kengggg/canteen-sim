@@ -165,3 +165,50 @@ test('capacity: 2-lane edges hold cap per direction, >= 4 lanes hold lanes·cap 
   const we = G.edges[P.edgeBetween(wp[0], wp[1])];
   expect(w.mv.onEdgeCount).toBe(Math.min(20, we.capacity));
 });
+
+test('after a placement on a 1-lane aisle, two followers at adjacent mid-link nodes both turn back and leave within 2·(T_L + h)', () => {
+  const s = sim();
+  const east = hPath(10175, 8600, 11600); // [v0, s0, s1, s2, v1]
+  const [v0, s0, s1, s2] = east;
+  const hold = new Set<number>();
+  s.onArrive = (p, node) => {
+    if (p === 0 && node === s2) { s.mv.stop(p); s.mv.busy(s2, 1); return false; }
+    if (p === 2 && node === s0) return false; // follower B waits at s0, still registered east
+    if (hold.has(p) && node === v0) s.done[p] = true;
+    return true;
+  };
+  // Link-direction invariant: everyone on a 1-lane edge is registered on its link in the direction of travel.
+  let violations = 0;
+  const admit = s.mv.admitStep.bind(s.mv);
+  s.mv.admitStep = () => {
+    admit();
+    for (let p = 0; p < 3; p++) {
+      const e = s.mv.edge[p];
+      if (e < 0 || G.edges[e].lanes !== 1) continue;
+      if (s.mv.regLink[p] !== G.edges[e].link || s.mv.regDir[p] !== s.mv.dir[p]) violations++;
+    }
+  };
+  s.add(0, [v0, s0, s1, s2], 0); // claimer
+  s.add(1, [v0, s0, s1, s2], 300); // follower A: waits at s1 for the busy s2
+  s.add(2, [v0, s0, s1], 600); // follower B
+  s.run(2500);
+  const placeEnd = 2500 + 3000;
+  s.at(placeEnd, () => {
+    s.mv.busy(s2, -1);
+    hold.add(1).add(2);
+    s.reroute(0, [s2, s1, s0, v0]);
+    s.reroute(1, [s1, s0, v0]);
+    s.reroute(2, [s0, v0]);
+  });
+  s.run();
+  const edges = east.slice(1).map((n, i) => G.edges[P.edgeBetween(east[i], n)]);
+  const TL = edges.reduce((a, e) => a + travel(e.lengthMm, 1000), 0);
+  const h = ceilDiv(600_000, 1000);
+  for (const p of [1, 2]) {
+    const last = s.arrivedAt[p][s.arrivedAt[p].length - 1];
+    expect(s.paths[p][s.paths[p].length - 1]).toBe(v0);
+    expect(last - placeEnd).toBeLessThanOrEqual(2 * (TL + h));
+  }
+  expect(s.mv.linkDir(G.edges[P.edgeBetween(v0, s0)].link)).toBe(0);
+  expect(violations).toBe(0);
+});

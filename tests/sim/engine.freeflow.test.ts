@@ -9,12 +9,12 @@ function runB(seed = 1, onTrace?: (s: Sim, t: Tr) => void) {
   sim = new Sim(defaultConfig(), {
     seed,
     reserveFraction: 0,
-    trace: (ev, a, b, c) => {
+    trace: (ev: string, a: number, b: number, c: number) => {
       const t = { ev, ms: sim.world.now, a, b, c };
       traces.push(t);
       onTrace?.(sim, t);
     },
-  } as never);
+  });
   sim.advanceTo(Infinity);
   return { sim, w: sim.world, traces };
 }
