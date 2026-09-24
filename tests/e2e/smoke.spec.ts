@@ -9,19 +9,29 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
-/** A fresh context always shows the first-visit panel after mount; wait for it, then close it. */
+const DISMISSED = () => { try { localStorage.setItem('canteen-sim:howto-dismissed', '1'); } catch { /* sandboxed */ } };
+
+/** Tests other than the first-visit one start with the panel already dismissed (set before any page script runs). */
+test.beforeEach(async ({ context }) => {
+  await context.addInitScript(DISMISSED);
+});
+
 async function dismissHowTo(page: Page) {
-  const close = page.getByRole('dialog', { name: 'How this works' }).getByRole('button', { name: 'Close' });
-  await close.click({ timeout: 15_000 });
+  void page;
 }
 
-test('the How this works panel shows on the first visit only', async ({ page }) => {
+test('the How this works panel shows on the first visit only', async ({ browser }) => {
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
   await page.goto('/');
-  await expect(page.getByRole('dialog', { name: 'How this works' })).toBeVisible();
-  await dismissHowTo(page);
+  const dialog = page.getByRole('dialog', { name: 'How this works' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toHaveCount(0);
   await page.reload();
-  await page.waitForTimeout(500);
-  await expect(page.getByRole('dialog', { name: 'How this works' })).toHaveCount(0);
+  await page.waitForTimeout(800);
+  await expect(dialog).toHaveCount(0);
+  await ctx.close();
 });
 
 test('loads without console errors; skip to 12:30 then play 120 frames at 120×', async ({ page }) => {
@@ -67,7 +77,9 @@ test('settings round-trip through the URL and through the settings code', async 
 });
 
 test('narrow layout (375 px): no horizontal scroll, A stacked above B', async ({ browser }) => {
-  const page = await browser.newPage({ viewport: { width: 375, height: 800 } });
+  const ctx = await browser.newContext({ viewport: { width: 375, height: 800 } });
+  await ctx.addInitScript(DISMISSED);
+  const page = await ctx.newPage();
   await page.goto('/');
   await dismissHowTo(page);
   const sw = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
@@ -80,6 +92,7 @@ test('narrow layout (375 px): no horizontal scroll, A stacked above B', async ({
 test('locales th-TH and de-DE render the clock, counters and first CSV row byte-identically to en-GB', async ({ browser }) => {
   const read = async (locale: string) => {
     const ctx = await browser.newContext({ locale });
+    await ctx.addInitScript(DISMISSED);
     const page = await ctx.newPage();
     await page.goto('/');
     await dismissHowTo(page);
