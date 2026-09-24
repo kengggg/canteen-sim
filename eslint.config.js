@@ -28,4 +28,12 @@ export default tseslint.config(
       'no-restricted-imports': ['error', { patterns: ['three', 'three/*', 'preact', 'preact/*', 'uplot', '@preact/*'] }],
     },
   },
+  {
+    // Module boundaries (spec §12.3): the sim, config and batch layers never touch the DOM or the view libraries.
+    files: ['src/sim/**/*.ts', 'src/config/**/*.ts', 'src/batch/**/*.ts'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: ['three', 'three/*', 'preact', 'preact/*', 'uplot', '@preact/*'] }],
+      'no-restricted-globals': ['error', 'window', 'document', 'navigator', 'localStorage', 'sessionStorage', 'requestAnimationFrame', 'HTMLElement', 'location'],
+    },
+  },
 );

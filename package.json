@@ -10,7 +10,11 @@
     "typecheck": "tsc --noEmit",
     "test:sanity": "vitest run --config vitest.sanity.config.ts",
     "bench": "vite-node scripts/bench.ts",
-    "precompute": "vite-node scripts/precompute.ts"
+    "precompute": "vite-node scripts/precompute.ts",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

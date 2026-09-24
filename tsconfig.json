@@ -10,8 +10,10 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "lib": ["ES2022"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
     "types": ["vitest/globals", "node"]
   },
-  "include": ["src", "tests", "scripts", "vitest.config.ts", "vitest.sanity.config.ts"]
+  "include": ["src", "tests", "scripts", "vitest.config.ts", "vitest.sanity.config.ts", "vite.config.ts", "playwright.config.ts"]
 }
