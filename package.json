@@ -16,7 +16,8 @@
     "preview": "vite preview --port 4173 --strictPort",
     "test:e2e": "playwright test",
     "golden:update": "vite-node scripts/golden.ts",
-    "build:artifact": "npm run build && vite-node scripts/artifact.ts"
+    "build:artifact": "npm run build && vite-node scripts/artifact.ts",
+    "build:pages": "vite build && vite-node scripts/pages.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

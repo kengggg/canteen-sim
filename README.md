@@ -27,6 +27,7 @@ npm run bench          # A (100%) and B at defaults; fails on > 10% event drift 
 npm run precompute     # re-run the default reservation sweep (150 runs) into src/generated/evidence.json
 npm run golden:update  # Node reference hashes for the cross-browser self-test
 npm run build          # dist/index.html — one self-contained file
+npm run build:pages    # the same, checked self-contained (≤ 1.5 MB), plus dist/.nojekyll for GitHub Pages
 npx playwright install chromium firefox webkit   # once
 npm run test:e2e       # browser tests over `vite preview` of dist/ (CANTEEN_E2E_FIREFOX=0 skips Firefox)
 ```
@@ -42,7 +43,31 @@ same model version and press **Restart**: every event, and therefore every hash 
 Chromium, Firefox and WebKit, on the main thread and in workers. Batch results add the number of lunches; batch seeds
 are derived from the live seed (spec §10.1).
 
-## Publishing
+## Host on GitHub Pages
+
+The whole sim is one plain HTML file: code, styles, the batch worker and the precomputed evidence are all inside
+`dist/index.html`, and it makes no network requests. Any static host works, and so does opening the file from disk.
+
+**Automatic (recommended).** The workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) runs lint, type
+checks and unit tests, builds the page and deploys it on every push to `main`.
+
+1. Merge this work into `main`.
+2. In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
+3. Push to `main`, or run **Deploy to GitHub Pages** from the Actions tab. The site appears at
+   https://kengggg.github.io/canteen-sim/.
+
+**Manual.** Run `npm run build:pages` and upload `dist/index.html` (with `dist/.nojekyll` when deploying from a branch)
+to any static host: for example a `gh-pages` branch, or the root of another repository with Pages enabled.
+
+Notes:
+
+- GitHub Pages on a **private** repository needs GitHub Pro, Team or Enterprise. On a free plan, make the repository
+  public or publish `dist/index.html` from a separate public repository. A Pages site is public to anyone with its URL
+  (Enterprise can restrict it).
+- On Pages the page runs as an ordinary website: shared `#v=…` links load their settings, **Download** saves files,
+  batches run in Web Workers, and `?selftest=1` runs the determinism self-test.
+
+## Publishing (claude.ai artifact)
 
 `dist/index.html` is published as a **private claude.ai artifact**. Republishing goes to the same artifact URL so shared
 links never change.
