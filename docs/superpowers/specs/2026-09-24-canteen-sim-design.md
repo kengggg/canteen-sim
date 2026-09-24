@@ -1,7 +1,7 @@
 # Canteen Seat-Reservation Simulation — Design Spec
 
 - **Date:** 2026-09-24
-- **Status:** v2, revised after a four-lens review; awaiting owner review
+- **Status:** v3, revised after a four-lens review and a coverage/consistency check; awaiting owner review
 - **Repo:** `kengggg/canteen-sim` (private)
 - **Source sketch:** [`2026-09-24-layout-sketch.jpg`](2026-09-24-layout-sketch.jpg)
 
@@ -87,9 +87,14 @@ The owner wants to show free flow is better. That claim only convinces a skeptic
 
 - **Plan geometry** is integer **millimetres**: coordinates, lengths and path distances. Metre-valued settings are
   converted once with `Math.round(v·1000)`, and settings are stepped so that is exact (§9.1).
-- **Speeds** are integer **mm/s**.
+- **Speeds** are integer **mm/s**, converted once as `Math.round(v·1000)`.
 - **Event times** are integer **milliseconds of sim time**. Time 0 is `crowd.windowStart`.
-- **Durations** convert as `max(1, Math.round(seconds·1000))`.
+- **Durations.**
+  - Drawn durations (service and eating times) convert as `max(1, Math.round(seconds·1000))`.
+  - Duration settings (`search.patience`, `reserve.claimSearchLimit`, `eat.linger`, `tray.dropTime`,
+    `crowd.peakSpread`) convert as `Math.round(seconds·1000)`, so a 0 setting stays 0 ms.
+  - In the UI-side formulas of §7.2 and §9.2, `serviceMean`, `eat.mean`, `eat.linger` and window lengths are in
+    minutes (config seconds ÷ 60).
 - **Edge travel time** is `max(1, ceilDiv(lengthMm·1000, speedMmS))` ms.
   - `ceilDiv(a, b) = Math.floor((a + b − 1) / b)`, on non-negative integers.
   - Example: a 600 mm edge takes 462 ms at 1.3 m/s and 600 ms at 1.0 m/s.
@@ -221,14 +226,14 @@ to world `(x, 0, y)` with world `+Y` up.
 - Queue line 1 at `x = xw + 300`, line 2 at `x = xw + 900`.
 - Slot `j` (`j = 0 … m−1`) at `y = 3300 + 600·j`.
 - Exit gap: `x ∈ [xw + 1200, xw + f]` (east side).
-- Walkway stop: `(xw + 1200 + (f − 1200)/2, 3000 + Q − 700)`, rounded to mm.
+- Walkway stop: `(xw + 1200 + Math.round((f − 1200)/2), 3000 + Q − 700)`.
 
 **Left stall** (north edge `yn`, frontage `f`)
 
 - Counter face at `x = 3000`; slot `j` at `x = 3300 + 600·j`.
 - Line 1 at `y = yn + f − 300`, line 2 at `y = yn + f − 900`.
 - Exit gap: `y ∈ [yn, yn + f − 1200]` (north side).
-- Walkway stop: `(3000 + Q − 700, yn + (f − 1200)/2)`. For the southernmost stall this is ≤ `H − 1500`, because
+- Walkway stop: `(3000 + Q − 700, yn + Math.round((f − 1200)/2))`. For the southernmost stall this is ≤ `H − 1500`, because
   `f ≥ 1800`, so every stop lies on the left walkway.
 
 **Queue positions**
@@ -306,9 +311,13 @@ The queue folds back toward the counter.
 
 **Node ids**
 
-- Routing nodes come first. They are numbered by horizontal line (top walkway = 0, aisles `1 … R−1`, concourse = `R`),
-  then by x ascending. Nodes that lie only on the left walkway follow, by y ascending.
-- Stop nodes come next, numbered by line in the same order, then by position.
+- **Horizontal line index:** top walkway = 0; aisle `r` (between rows `r` and `r+1`, `r = 0 … R−2`) = `r + 1`;
+  concourse = `R`.
+- **Routing nodes** (intersections and terminals, all of which lie on horizontal lines) come first, by line index,
+  then x ascending.
+- **Stop nodes** follow: first those on horizontal lines, by line index then x ascending; then those only on the left
+  walkway, by y ascending.
+- A merged node belongs to the line of its merge cluster.
 - The layout asserts `N_nodes < 2¹⁶`.
 
 **Queue areas**
@@ -320,20 +329,27 @@ The queue folds back toward the counter.
 
 ### 4.2 Movement rules (mesoscopic, event-driven)
 
-People move edge by edge. An agent does work only when an event fires (§12.1).
+People move edge by edge. An agent does work only when an event fires (§12.2).
 
-1. **Entering an edge.** An agent at a node may enter the next edge of its route in direction `d` only if all of these
-   hold:
-   - (a) **1-lane line:** nobody is on that edge's link in direction `−d`, and the link is not closed to `d` (rule 3).
-     "On link L in direction d" lasts from entering L's first edge until leaving L. Leaving means reaching L's far
-     routing node, or stopping at a stop node on L to act or leave the graph. Waiting at a mid-link node counts as
-     still on L.
-   - (b) **Capacity:** the lane has room: fewer people in that lane than the edge's per-lane capacity. On edges with
-     ≥ 4 lanes, fewer than `lanes × per-lane capacity` people on the edge in total.
-   - (c) **Busy node:** the edge's far node is not busy (rule 7).
-
-   Otherwise it waits at the node, in that edge-direction's FIFO. Nodes have unlimited waiting room, so an agent on
-   an edge can always leave it; together with finite actions (rule 7), this rules out deadlock.
+1. **Entering an edge.**
+   - **Candidates.** An agent that needs an edge becomes a *candidate* for that edge in its direction at that ms. This
+     happens after a node arrival, an action end, a group arrival, a stall choice or a timer.
+   - **Admissions happen only in kind 6** (§8.5), never inside the event that made the agent ready. An agent that
+     continues through a node without stopping is admitted in kind 6 of the same ms, with `entryMs` = that ms.
+   - **Order.** For each edge-direction, candidates are examined in order: first the existing FIFO (by wait start,
+     then person id), then agents that became ready at this ms (by person id).
+   - **Conditions.** A candidate enters if all of these hold:
+     - (a) **1-lane link rule:** rule 3 allows direction `d`;
+     - (b) **capacity:** fewer people in its lane than the edge's per-lane capacity. On edges with ≥ 4 lanes, fewer
+       than `lanes × per-lane capacity` people on the edge in total;
+     - (c) **busy nodes:** the edge's far node is not busy, and on a 1-lane line the agent's own node is not busy
+       unless the agent is the actor (rule 7).
+   - **Waiting.** A candidate that fails joins the tail of that edge-direction's FIFO, with wait start = this ms. Only
+     then does it count as a *waiter*.
+   - **Repeated examination.** In kind 6 the engine re-examines affected FIFO heads in ascending (wait start, person
+     id) until none can be admitted. A blocked head blocks only its own FIFO.
+   - **No deadlock.** Nodes have unlimited waiting room, so an agent on an edge can always leave it. Together with
+     finite actions (rule 7) and batch alternation (rule 3), this rules out deadlock.
 2. **Lanes.**
 
    | Lanes on the edge | Rule |
@@ -341,18 +357,35 @@ People move edge by edge. An agent does work only when an event fires (§12.1).
    | 2–3 | One lane per direction (a third lane is unused); no overtaking within a lane. |
    | ≥ 4 | Open: total capacity as in rule 1(b), no direction rules, overtaking allowed. |
 
-3. **Alternation on 1-lane links.**
-   - Once any agent waits to enter link L in direction `−d` (at either end or at a mid-link node), L closes to new `d`
-     entries.
-   - When L empties, the direction whose earliest waiter has waited longest goes next; ties go to the lower person id.
-   - Within a direction, admission is FIFO by wait start, then person id.
+3. **1-lane links.**
+   - **Registration.** An agent is *registered* on link L in direction `d` from its admission to an edge of L in `d`
+     until it leaves L. It leaves L when it:
+     - reaches L's far routing node;
+     - stops at a stop node on L to act there or leave the graph (sit, ask, place, queue, tray return, exit);
+     - makes a U-turn.
+
+     Waiting at a mid-link node while continuing in `d` keeps the registration. Registered agents continuing on L in
+     `d` are never blocked by this rule, only by rules 1(b) and 1(c).
+   - **U-turns.** An agent registered on L in `d`, standing at a mid-link node, whose next edge on L runs in `−d` is
+     deregistered at that ms and becomes a candidate for `−d`. Its former registration never blocks it.
+
+     This covers a re-target after an observation, a failed arrival check, dispersal and a convoy reversal.
+   - **Waiters.** A *waiter for L in `d`* is an agent in the FIFO of an edge of L in `d` that is not registered on L.
+   - **Direction.** `dir(L) = d` while anyone is registered on L in `d`, and `none` otherwise.
+   - **Batches.** Whenever `dir(L) = none` and L has waiters, the next kind-6 step picks a direction and a batch:
+     - `d*` = the direction of the waiter with the smallest (wait start, person id);
+     - batch `B(L)` = every waiter for L in `d*` at that ms.
+
+     `B(L)` is cleared when `dir(L)` next becomes `none`.
+   - **Entry rule.** A new entry into L in `d` is allowed iff `dir(L) ∈ {none, d}` and either no waiter for L in `−d`
+     exists or the agent is in `B(L)`.
 4. **Travel time.** For an agent entering an edge at `entryMs`:
-   - Speed is `move.walkSpeed`, or `move.traySpeed` while carrying food.
+   - Speed is `move.walkSpeed`, or `move.traySpeed` while carrying a tray (food, or a used tray, §5.8).
    - `exitMs = max(entryMs + travelMs, predecessorExitMs + headwayMs)`, where
      `headwayMs = ceilDiv(600·1000, speedMmS)`.
-   - The predecessor is the agent ahead in the same lane.
-   - On edges with ≥ 4 lanes there is no predecessor term.
-   - An agent that continues without waiting enters its next edge at the same ms it exits.
+   - The **predecessor** is the agent that most recently entered the same lane of the same edge in the same direction
+     before this agent, by `entryMs` then admission order, whether or not it has already exited.
+   - With no predecessor, or on edges with ≥ 4 lanes, the second term is dropped.
 5. **Rendering** interpolates each agent along its current segment between entry and exit time. Followers in a lane
    are drawn ≥ 0.6 m behind their leader (§11.9).
 6. **Routing.** See §4.3.
@@ -367,26 +400,44 @@ People move edge by edge. An agent does work only when an event fires (§12.1).
 
    While a person performs one of these at a stop node on a **1-lane** line, that node is **busy**:
    - no agent may enter an edge whose far end is that node;
-   - agents already waiting at the node, other than the actor, may not leave it along that line until the action
-     ends.
+   - agents already at the node, other than the actor, may not leave it along that line until the action ends.
 
    Actions on lines with ≥ 2 lanes block nothing. Actions are finite, so busy nodes cannot deadlock.
+8. **Re-planning.**
+   - **On an edge.** A re-plan fires on a new target, a fallback, a walk-away, dispersal, or a new seat or stall. If it
+     fires while the agent is on an edge, it takes effect at that edge's far node: the agent finishes the edge and
+     routes from there.
+   - **In a queue area.** During a queue-area path, it takes effect at the walkway stop.
+   - **What happens at the event ms.** Stall choice (and its `queueLength` count), patience start, the walk-away count
+     and the searcher role are all decided at the event ms. Only the route, and a new search's first observation,
+     wait for the next node or walkway stop.
 
 ### 4.3 Routing
 
 - **Terminals.** A line segment beyond the last intersection at either end of a line ends in a *terminal*: its
   outermost stop node. Terminals join intersections as routing nodes.
-- **Precompute.** All-pairs integer-mm distances `D` and **equal-shortest next-hop sets** are precomputed between
-  routing nodes, with one Dijkstra per routing node. A next-hop set holds every neighbour whose edge length plus
-  remaining distance equals the minimum **exactly**.
-- **Distances.** Each stop `s` lies on a segment between two consecutive routing nodes `e1, e2`.
-  - For a target `t` on the same segment, `dist = |pos_s − pos_t|`, and the agent walks along the segment directly.
+- **Precompute.** All-pairs integer-mm distances `D` between routing nodes are precomputed, with one Dijkstra per
+  routing node.
+- **Distances.** Each stop `s` lies on a segment between two consecutive routing nodes `e1, e2` (`e1 = e2 = s` if `s`
+  is itself a routing node).
+  - For a target `t` on the same segment, `dist(s, t) = |pos_s − pos_t|`.
   - Otherwise `dist(s, t) = min over e ∈ ends(s), f ∈ ends(t) of d(s,e) + D(e,f) + d(f,t)`.
-  - The first hop goes toward the minimising end.
-- **Tie-break.** When `k > 1` next hops tie, the agent takes index `Math.floor(u·k)` among the options sorted by node
-  id. Here `u` is the `route` draw keyed by `(personId, currentNodeId·N_nodes + targetNodeId)`.
-  - The same person at the same node toward the same target therefore makes the same choice in both canteens.
-  - This spreads traffic across parallel aisles.
+  - All terms are integer mm.
+- **Hop-by-hop routing.** Routing decisions are made at routing nodes, and at the stop node where a trip starts.
+  - **At a routing node `e` toward target `t`:** the options are each incident link direction whose next routing node
+    `v`, or `t` itself when `t` lies on that link, satisfies `linkLen + dist(v, t) = dist(e, t)` exactly.
+  - **At a stop node `s` that is not a routing node:** the options are its two segment directions. Each is kept when
+    `d(s, e_i) + dist(e_i, t) = dist(s, t)` holds. When `t` is on the same segment, the only option is the direction
+    toward `t`.
+- **Tie-break.** When `k > 1` options remain:
+  - they are sorted by the node id of their next routing node (or `t`);
+  - the agent takes index `Math.floor(u·k)`, where `u` is the `route` draw keyed by
+    `(personId, currentNodeId·N_nodes + targetNodeId)`;
+  - `currentNodeId` is the node where the choice is made, and `targetNodeId` is the final target.
+
+  Consequences:
+  - The same person at the same node toward the same target makes the same choice in both canteens.
+  - Traffic spreads across parallel aisles.
 - Routes do not react to congestion.
 
 ---
@@ -402,10 +453,10 @@ People move edge by edge. An agent does work only when an event fires (§12.1).
 
   `F(t) = s·[Φ((t−μ)/σ) − Φ(α)] / [Φ(β) − Φ(α)] + (1−s)·t/T`
 
-  where:
+  where (all quantities in ms):
   - `s = crowd.peakShare`;
-  - `μ = peakTime − windowStart`;
-  - `σ = crowd.peakSpread`;
+  - `μ = (peakTime − windowStart)·60,000`, since clock times are stored in minutes;
+  - `σ = crowd.peakSpread·1,000`, since it is stored in seconds;
   - `α = −μ/σ` and `β = (T−μ)/σ`;
   - `Φ` is `dnormcdf` (§8.5).
 - A group's arrival ms is the smallest integer `t ∈ [0, T]` with `F(t) ≥ u(arrival, groupId)`. It is found by integer
@@ -430,7 +481,9 @@ People move edge by edge. An agent does work only when an event fires (§12.1).
 - on entry, for free-flow members and a reserving group's non-claimers;
 - on dispersal or fallback, for claimers and `together`-mode members.
 
-Same-ms choices run in ascending person id, and each chooser sees the counts left by earlier choosers.
+Choices made in one event run in ascending person id. Examples: the members of an arriving group, a dispersal, a
+fallback. Choices made in different events at the same ms follow the §8.5 event order. Either way, each chooser sees the
+counts left by choices already processed.
 
 **The utility.** The person takes the non-full stall that maximises
 
@@ -453,14 +506,22 @@ Same-ms choices run in ascending person id, and each chooser sees the counts lef
 
 **Joining and moving up**
 
-- At the walkway stop the person is given position `1 + (number of people ahead in the queue)`.
-- They walk to that slot at `walkSpeed` (§3.6).
-- **Queue join** = the ms they reach the slot.
-- When a position ahead empties, each person behind moves up one position in `ceilDiv(600·1000, walkSpeedMmS)` ms.
+- **People ahead** = everyone holding a position at the stall: in a slot, moving up, or walking in.
+- **Assigned slot.** At the walkway stop the person is given position `1 + (people ahead)`, so two people never share
+  a position. They walk to that position's slot at `walkSpeed` (§3.6). Their walk target stays that slot even if
+  positions ahead empty meanwhile.
+- **Queue join** = the ms they reach the slot (kind 4, §8.5).
+- **Moving up.** When a position ahead empties, the person behind it moves up one position, taking
+  `ceilDiv(600·1000, walkSpeedMmS)` ms.
+  - Move-ups for one person are sequential: one that becomes due while another is running starts when the current
+    one ends.
+  - A person arriving at its slot then makes one move-up for each position that emptied ahead of it during the walk.
+- **Queue-area paths.** Each leg is a separate segment with time `max(1, ceilDiv(legMm·1000, speedMmS))`, and the path
+  time is the sum of its legs.
 
 **Service**
 
-- Service starts on reaching position 1.
+- Service starts at the end of the walk-in or move-up that brings the person to position 1 (kind 4).
 - One server per stall; FIFO.
 - Service time is lognormal with mean `stalls.serviceMean` and coefficient of variation `stalls.serviceCV`, drawn from
   the `service` percentile (§8.4). It covers order, cooking and payment.
@@ -497,10 +558,17 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
 1. The claimer is the member with the lowest person id. Every other member chooses a stall and walks there on entry.
 2. **Claim search.** The claimer searches (§5.5) for a **completely empty table**: nobody seated, no held seats, no
    object. The claimer walks at `move.walkSpeed`.
-3. **Claim target.** Among remembered, completely empty tables, the claimer targets the one that minimises
-   `path(current node → table) + mean over members of path(table → member's stall walkway stop)`.
-   - For the claimer itself, the stall used is its provisional best stall at entry, not yet committed.
-   - Ties go to the lower table id.
+3. **Claim target.** For each remembered, completely empty table `τ`:
+   - `a(τ)` is the access node of `τ`'s seats that minimises `dist(current node, a)`; ties go to the lower node id.
+   - `score(τ) = n·dist(current node, a(τ)) + Σ over members of dist(a(τ), member's stall walkway stop)`. This is an
+     integer equal to `n ×` (the claimer's walk + the mean member walk).
+   - The target is `argmin score`, with ties to the lower table id. The claimer walks to `a(τ)`.
+   - **Which stall a member uses in the score:**
+     - a member that has chosen a stall uses that stall;
+     - a member that found every stall full uses the stall whose walkway stop it is walking to or waiting at;
+     - a member that has not chosen yet (the claimer; every member in `together`) uses its **provisional best
+       stall**: `argmax U_s` over non-full stalls at the group's entry ms. It is computed once, never re-evaluated,
+       and not counted in `queueLength`.
 4. **Claim.** On reaching the table, if it is still completely empty, the table is **claimed from that ms**, and the
    claimer places the object (3,000 ms).
    - All seats are blocked to everyone else. Any object claims the whole table, because an onlooker cannot tell how
@@ -515,17 +583,24 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
 7. **Seat fill order.**
    - The first side is the side whose access node the claimer stood on when placing the object.
    - Order: that side `i = 0 … k−1`, then the opposite side `i = 0 … k−1`.
-   - Each member gets the next unassigned seat at its service-end ms; same-ms ties go by ascending person id.
-   - Unassigned seats stay `claimedEmpty` until the group is complete.
+   - **Assignment time.**
+     - Members who already hold food when the claim takes effect (the claimer's arrival ms) are assigned at that ms,
+       in ascending (service-end ms, person id). They start walking at that ms, without waiting for the place end.
+     - Every other member is assigned at its own service-end ms; same-ms ties go by ascending person id.
+   - **Seat states.** An assigned seat whose member has not started sitting is `held`. Unassigned seats are
+     `claimedEmpty` until the group is complete.
 8. **Claim cutoff.** `reserve.claimSearchLimit`, counted from entry, stops the choice of **new** claim targets.
-   - A target chosen before the cutoff is still pursued. If it is not completely empty on arrival, the group falls
-     back then.
+   - A target chosen before the cutoff is still pursued, and it is then **frozen**. Observations still update memory,
+     but they never change the target table or node.
+   - If an observation after the cutoff shows the target no longer completely empty (a seat observed occupied, or
+     the table claimed), the group falls back at that node-arrival ms. Otherwise the arrival check decides: if the
+     table is not completely empty on arrival, the group falls back then.
    - A claimer with no current table target at the cutoff falls back at the cutoff.
    - With a limit of 0, only tables observed at the entrance node at the entry ms can be targeted. If none is empty,
      the group falls back at once.
 9. **Fallback.** The group becomes a free-flow party for this visit, and is counted once as a *fallback reserver*.
    - The claim-search memory is discarded.
-   - The claimer chooses a stall from its current node.
+   - The claimer chooses a stall at the fallback ms. If it is on an edge, it finishes that edge first (§4.2 rule 8).
    - The searcher is the first member with food. If a member already holds food, it becomes the searcher at the
      fallback ms.
    - Patience counts from the later of its service end and the fallback ms.
@@ -534,10 +609,13 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
 **Claim mode `together` (setting)**
 
 - The whole group walks as a **convoy** of individual agents. The leader (lowest person id) runs the claim search.
-  - The others follow the leader's route, in person-id order, under the normal lane rules.
-  - Observation, target choice and the arrival check use the leader.
+  - The engine records the sequence of nodes the leader arrives at from entry.
+  - Each follower walks exactly that sequence, in person-id order behind the leader. It uses no route draws of its
+    own and enters each edge under §4.2, including U-turns where the leader turned.
+  - Observation, target choice and the arrival check use the leader. In the claim-target score, every member uses its
+    provisional best stall (point 3).
 - Stalls are chosen at dispersal or fallback.
-- Once the object is placed (3,000 ms), or on fallback, each member leaves for its stall from its current node. A
+- Once the object is placed (3,000 ms), or on fallback, each member re-plans toward its stall under §4.2 rule 8. A
   member on an edge finishes that edge first.
 - Every other rule is as in `oneClaimer`.
 
@@ -548,9 +626,12 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
 - Memory belongs to the searcher, or to the claimer (or convoy leader) during a claim search.
 - It starts empty when the search starts:
   - at the stall walkway stop after service, for a free-flow search;
+  - at the next node or walkway stop after a fallback (§4.2 rule 8);
   - at entry, for a claim search.
-- It is discarded when the search ends.
-- One entry per observed table: `{observedMs, per-seat occupied|empty, claimed, seatedCount, refusedUntilMs}`.
+- It is discarded when the search ends, including at fallback.
+- It holds:
+  - one entry per observed table: `{observedMs, per-seat occupied|empty, claimed, seatedCount, refusedUntilMs}`;
+  - the searcher's visited-intersection history (last arrival ms per intersection).
 
 **Observation**
 
@@ -569,9 +650,10 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
 
 **Target**
 
-- The target is the nearest suitable table by `distance(table)` = the minimum path distance (§4.3) to the access node
-  of any seat recorded as empty (for a claim search, any seat).
+- **Free-flow searches** target the nearest suitable table by `distance(table)`: the minimum path distance (§4.3) to
+  the access node of any seat recorded as empty.
 - Ties go to the lower table id, then the lower node id. The searcher walks to that node.
+- **Claim searches** use §5.4 point 3 instead.
 - `search.emptyTableDetour` modifies this rule (§5.10).
 - After every observation the target is recomputed. If it changes, the searcher reroutes at once.
 
@@ -579,7 +661,8 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
 
 - With no suitable remembered table, the searcher walks to the nearest intersection not visited in the last 60,000 ms.
 - If every intersection has been visited within that time, it goes to the one visited longest ago.
-- Ties go to the lower node id. Visited means the searcher stood at that intersection.
+- *Nearest* means `dist` (§4.3) from the current node, recomputed at each node arrival. Ties go to the lower node id.
+- *Visited* means arriving at that intersection during this search. Earlier walking does not count.
 - A free-flow searcher holding food while exploring is **stuck**. Stuck time feeds a metric (§7.3).
 
 **Arrival check** (on the true state)
@@ -602,11 +685,13 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
 **Seat choice at commit**
 
 - **Unclaimed table.** List every `n`-subset of free seats (at most `C(8,4) = 70`). Pick the one that minimises the key
-  `(sidesUsed, contiguousRuns, −facingPairs, sorted seat-id list)`:
+  `(sidesUsed, contiguousRuns, −facingPairs, −here, sorted seat-id list)`:
   - `contiguousRuns` = maximal runs of consecutive `i` on the same side, summed over both sides;
-  - `facingPairs` = the number of `i` with both `(N,i)` and `(S,i)` in the set.
-  - Example: `n = 4` at an empty 6-seat table picks `N0, N1, S0, S1`.
-- **Joiners at a claimed table.** Minimise `(−min d², contiguousRuns, −Σ nearest d², sorted seat-id list)`:
+  - `facingPairs` = the number of `i` with both `(N,i)` and `(S,i)` in the set;
+  - `here` = 1 if the set contains a seat whose access node is the searcher's current node, else 0.
+  - Example: `n = 4` at an empty 6-seat table, with the searcher at seat 0's or seat 1's access node, picks
+    `N0, N1, S0, S1`.
+- **Joiners at a claimed table.** Minimise `(−min d², contiguousRuns, −Σ nearest d², −here, sorted seat-id list)`:
   - `d²` is the integer squared Euclidean distance (mm²) to every occupied or held seat at the table;
   - seat steps are 600 mm along a side, and 1300 mm across the table.
   - Example: with claimers at `N0, N1`, a joining pair takes `S1, S2`.
@@ -647,14 +732,16 @@ ask on the true state:
 - A reserving group that has claimed never walks away.
 - A party that has committed never walks away, and its held seats stay held until each member sits.
 - **At the patience timer:**
-  - mid-ask: the decision waits for the ask's outcome; if accepted, the party commits, and if refused, it walks away
-    at the ask's end;
+  - mid-ask: the party walks away at the ask's end unless that ask ends in a commit. Every non-commit outcome counts,
+    including a failed rule-1 test at a table that became unclaimed. With `search.parallel`, the decision waits for
+    every pending ask: the party commits if any of them commits, and otherwise walks away at the last one's end;
   - committed or sitting: nothing happens;
   - otherwise: the group walks away at that ms.
 
 **What happens at the decision**
 
-- Members holding food go straight to the tray return. Their food is packed as takeaway there.
+- Members holding food go straight to the tray return. Their food is packed as takeaway there, which counts as a
+  tray drop: they join the same FIFO and hold a slot for `tray.dropTime`, then walk to the exit at `move.walkSpeed`.
 - Members without food keep buying: walking to a stall, waiting for a queue, queuing or being served. Each goes
   straight to the tray return at its service end.
 - Every member counts as a **walk-away** from the decision ms.
@@ -666,9 +753,11 @@ ask on the true state:
 - **Standing up.** The party stands up together at `T_stand = max over members (eat end) + eat.linger`.
   - Seats stay `occupied` until `T_stand + 3,000` ms.
   - Then they are released, and the object is removed if this is the claiming group.
-- **Tray return.** Every person walks to the tray return and waits FIFO for one of `tray.slots` slots. Dropping a tray
-  takes `tray.dropTime`.
-- **Exit.** They then walk to the exit and are removed. **Everyone returns a tray** (decision #11).
+- **Tray return.** Every person walks to the tray return carrying their used tray, at `move.traySpeed` with the tray
+  cue. They wait FIFO for one of `tray.slots` slots. Dropping a tray takes `tray.dropTime`; the next drop starts in the
+  event that frees the slot.
+- **Exit.** They then walk to the exit at `move.walkSpeed` and are removed. **Everyone returns a tray** (decision
+  #11).
 
 ### 5.9 State-change timing (normative)
 
@@ -695,8 +784,11 @@ ask on the true state:
 
 **`search.emptyTableDetour = d` (metres)**
 
+- Applies only when `d > 0`. At `d = 0` (the default), targeting is exactly §5.5, including its tie-breaks.
 - A free-flow party targets the nearest **completely empty** suitable table if its distance ≤ (distance to the
   nearest suitable table) + `d`. Otherwise it targets the nearest suitable table.
+- "Completely empty" is as remembered: every seat observed empty, and the table unclaimed. Ties among completely empty
+  tables go to the lower table id, then the lower node id.
 
 ---
 
@@ -726,11 +818,11 @@ Every seat is in exactly one state at every ms. **Precedence:**
 | `occupied` | Someone is sitting there: from sit start to stand end. | Seated |
 | `held` | Committed to a party member who has not started sitting. | Saved for a groupmate |
 | `claimedEmpty` | Unoccupied seat at a claimed table whose group is not complete. | Reserved, group not all seated |
-| `openToSmall` | Unoccupied, unheld seat at a claimed table whose group is complete, where unoccupied unheld seats ≥ `shareMinEmpty`. | Reserved, open to parties of ≤ {shareMaxParty} |
+| `openToSmall` | Unoccupied, unheld seat at a claimed table whose group is complete, where unoccupied unheld seats ≥ `shareMinEmpty`. | Reserved, open to parties of ≤ {min(shareMaxParty, unoccupied unheld seats at that table)} |
 | `blockedLeftover` | As above, but with fewer than `shareMinEmpty` unoccupied unheld seats. | Reserved, spare seats nobody can use |
 | `free` | Any other unoccupied, unheld seat. | Free |
 
-Seat-seconds per state are integrated exactly, from six running per-state seat totals (§12.1). They are also binned
+Seat-seconds per state are integrated exactly, from six running per-state seat totals (§12.2). They are also binned
 per sim minute.
 
 ### 7.2 Primary endpoints (decision #18)
@@ -743,11 +835,11 @@ UI states how many intervals it shows.
 |---|---|---|---|
 | P1 | **Walk-away %** | Walk-away people ÷ actual arrivals × 100. | lower |
 | P2 | **Mean entrance-to-seat-or-give-up** | Over **every arrival**: (sit-start ms, or the group's walk-away decision ms) − entrance ms, in minutes. | lower |
-| P3 | **Peak seat utilization** | `occupied` seat-seconds ÷ (seats × 3,600 s) over the peak window (§7.7). | higher |
+| P3 | **Peak seat utilization** | `occupied` seat-seconds ÷ (seats × window length in s) over the pair's peak window (§7.7). It is a *PairMetric*. | higher |
 | P4 | **Peak throughput** | The maximum number of sit starts in any 60-minute window `[t, t + 3,600,000)`. It is shown next to the stall ceiling `60·S / serviceMean` people per hour (1,200/h at defaults). | higher |
 
-**Seated diners** = arrivals − walk-aways. It is shown beside P1 as a count only: it is exactly P1's complement, so
-it gets no interval and no win count of its own.
+**Seated diners** = people with a sit start. At done it equals arrivals − walk-aways (invariant, §13.3). It is shown
+beside P1 as a count only: it is exactly P1's complement, so it gets no interval and no win count of its own.
 
 ### 7.3 Secondary metrics
 
@@ -758,7 +850,7 @@ it gets no interval and no win count of its own.
 | **Seats blocked while needed** | `Σ` over *demand ms* of seats in {held, claimedEmpty, blockedLeftover} ÷ `Σ` over demand ms of all seats. A demand ms is one with ≥ 1 stuck free-flow searcher in that canteen (§5.5). Demand minutes are shown next to it. With no demand, the value is 0. `openToSmall` during demand is shown on a separate line, not in the numerator. | lower |
 | **Seat search time (with food)** | Per group: searcher's service end → commit or walk-away decision. It is 0 for groups that sat at their claimed table. Mean and p90 over all groups. | lower |
 | Queue wait | Queue join → service start; mean and p90. | lower |
-| Seat utilization, whole | As P3, over `[0, T + 60 min]`. | higher |
+| Seat utilization, whole | `occupied` seat-seconds inside `[0, T + 60 min]` ÷ (seats × (T + 60 min) in s). Occupancy after `T + 60 min` is not counted. | higher |
 
 ### 7.4 Diagnostics (no win counts)
 
@@ -769,9 +861,14 @@ it gets no interval and no win count of its own.
 - Fallback reservers.
 - Claim search time: per reserving group, entry → claim or fallback.
 - **Split-feasible walk-aways:** walk-away groups for which the canteen had ≥ `n` seats in state `free` across all
-  tables at the decision ms. Reported as a count and a %.
+  tables at the decision ms.
+  - Reported per canteen as a count and a % of walk-away groups and of walk-away people, overall and per group size
+    1–6.
+  - CSV columns: `splitFeasibleGroups`, `splitFeasiblePeople`, and `splitFeasibleGroups_s{n}` /
+    `splitFeasiblePeople_s{n}` for n = 1…6.
 - Standing-with-food person-minutes: people holding food who are waiting, not walking.
-- `walkAwayServedAfterDecision`.
+- `walkAwayServedAfterDecision`: the number, and % of walk-away people, whose service ended after their group's
+  walk-away decision ms.
 - Total visit of seated diners (mean, median, p90).
 - Stuck minutes.
 - Events per kind.
@@ -784,13 +881,13 @@ it gets no interval and no win count of its own.
   - mean entrance-to-seat-or-give-up;
   - mean food-to-seat-or-give-up;
   - group and person counts.
-- **By reserver cohort** (SK6). For the level being compared:
+- **By reserver cohort** (R12; a *PairMetric*). For the level being compared:
   - Cohort R = groups with `r_g < fraction`; cohort N = the rest.
   - In B the same group ids form R ("would-be reservers").
   - Within A, R splits into *claimed* and *fallback*, each against the same groups in B.
   - Per cohort, A and B, report walk-away %, and the mean, median and p90 of entrance-to-seat-or-give-up, plus mean
     food-to-seat-or-give-up.
-  - Paired `A − B` per cohort, with CI.
+  - Paired free-flow advantage per cohort, with CI. Every cohort metric is lower-is-better, so this is `A − B`.
   - Empty cohorts show `—`.
   - CSV prefixes: `cohortR_`, `cohortN_`, `cohortRclaimed_`, `cohortRfallback_`.
 
@@ -799,22 +896,34 @@ it gets no interval and no win count of its own.
 **Live counters**
 
 - Seats by state (stacked bar, display labels)
-- Queuing: stall queues, including the person being served and people waiting because every queue was full
+- Queuing: people from reaching their stall's walkway stop until service end, including the person being served
+  and people waiting because every queue was full; excludes the tray return. This is the same set as the *Queuing*
+  colour class.
 - Searching with food now
 - Claiming a table now (A only)
 - Standing with food now
 - Walk-aways so far
-- Seated diners per rolling 60 min
+- Sit starts in the last 60 min
 - Mean entrance-to-seat-or-give-up so far
 
 **Difference strip**
 
 - It shows the *free-flow advantage* (§10.3) for P1–P4.
 - It shows `—` until both canteens have a value, and updates once per sim minute.
+- **Provisional values before done**, from `engine.live()`:
+  - P1 = walk-aways so far ÷ arrivals so far × 100;
+  - P2 = the mean over arrivals so far of (outcome ms, or *now* if no outcome yet) − entrance ms;
+  - P4 = the maximum sit starts in any 60-min window ending at or before now;
+  - P3 shows `—` until both runs are done.
+
+  At done, the §7.2 values replace them.
 - It is labelled *"This lunch only. One lunch can be luck; see Batch for 30."*
 
-**Time series.** Seat counts per state are sampled every 60,000 sim-ms, from 0 until done. They are drawn as two
-stacked-area panels (A and B) with a shared y-axis `0 … seats`, a clock-time x-axis and the peak window shaded.
+**Time series.**
+- Each minute's point is the mean seat count per state over that minute: the minute bin's seat-seconds ÷ 60. The last
+  minute is partial and divides by its actual length.
+- They are drawn as two stacked-area panels (A and B), from 0 until done, with a shared y-axis `0 … seats`, a
+  clock-time x-axis and the peak window shaded.
 
 ### 7.7 Computation rules
 
@@ -824,11 +933,21 @@ stacked-area panels (A and B) with a shared y-axis `0 … seats`, a clock-time x
   - It is the 60-minute window, starting on a whole sim minute, that maximises the sum over **both** runs of
     seat-seconds in any non-`free` state.
   - Ties go to the earliest start.
-  - The window is clipped to `[0, end]`.
+  - The window is clipped to `[0, end]`, where `end` = the later of the two runs' final ms, rounded up to a whole
+    minute.
   - The start time is written to the CSV. In the live view it is computed once both runs finish.
+- **RunMetrics vs PairMetrics.**
+  - *RunMetrics* depend on one run only. They are returned by `engine.metrics()`, folded into `runHash`, and written
+    as one CSV row per run.
+  - *PairMetrics* are P3, the peak-window seat-time shares and the cohort breakdowns. They are computed by
+    `pairMetrics(levelRun, baselineRun)` from both runs' minute bins and per-group records. They are never part of
+    `runHash`, and are written as one CSV row per (seed, level ≠ 0) pair, with the prefix `pair_`, including
+    `pair_peakWindowStart`.
+  - In each pair, the baseline's P3 uses that pair's window.
 - **Empty populations.** A per-run metric with an empty population, or a 0/0 ratio, is `null`. Nulls are excluded
   from means and CIs, and `n_used` is shown.
-- **Timing.** Metric and hash values are computed only when a run is `done`.
+- **Timing.** RunMetrics, PairMetrics and hashes are computed only when done. `engine.live()` values are
+  provisional.
 
 ---
 
@@ -894,7 +1013,10 @@ reshuffles unrelated draws.
   - `dlog` and `dexp`, using range reduction by exact ×2 / ×0.5 loops plus polynomials;
   - `dnormcdf`, Cody's rational erfc on `dexp`;
   - `dnorminv`, Acklam's method, with tails via `Math.sqrt(−2·dlog p)`.
-- Accuracy against `Math.*` in Node:
+- Accuracy, checked in Node:
+  - `dlog` and `dexp` against `Math.log` and `Math.exp`;
+  - `dnormcdf` and `dnorminv` against high-precision reference values (mpmath at 30 digits) stored in
+    `tests/golden/dmath.json`, since JavaScript has no `Math` counterpart for them.
 
   | Function | Tolerance |
   |---|---|
@@ -918,24 +1040,47 @@ reshuffles unrelated draws.
 
 **Event order within one ms**
 
-1. action completions: sit end, stand end (seat release and object removal), place end, ask end, tray-drop end;
-2. service completions;
-3. edge exits: node arrival, observation and the on-arrival decisions (table check, commit, claim, starting a sit,
-   ask or place, queue arrival, tray-queue join, exit removal);
-4. queue advances and service starts;
-5. group arrivals at the entrance;
-6. edge admissions (FIFO-head wakes);
-7. timers: patience, claim cutoff, the 5 s re-choose.
+1. **Action completions:**
+   - sit end;
+   - stand end (seat release and object removal);
+   - place end;
+   - ask end (with its decision);
+   - tray-drop end (the next queued drop starts in the same event).
+2. **Service completions**, keyed by the served personId.
+3. **Edge exits and node arrivals.** This covers observation and every on-arrival decision:
+   - table check, commit and claim;
+   - starting a sit, ask or place;
+   - arrival at a stall walkway stop (position assignment);
+   - tray-queue join or drop start;
+   - exit removal.
+4. **Queue events**, keyed by stallId: move-ups, walk-in arrivals at slots (queue join) and service starts.
+5. **Group arrivals** at the entrance.
+6. **Edge admissions.** Every edge entry happens here (§4.2 rule 1).
+7. **Timers:**
+   - patience;
+   - claim cutoff;
+   - the 5 s re-choose;
+   - eat end;
+   - stand start (`T_stand`, keyed by the party's lowest personId).
 
-Within a kind, order is by entity id: personId, the leader's personId for group events, or stallId for stall
-events. Then comes a global insertion sequence number.
+**Keys and ties**
 
+- Within a kind, order is by entity id: personId; for group events, the lowest member personId; for kind 4, stallId.
+  Then comes a global insertion sequence number.
 - The heap key is `(ms, kind, entityId, seq)`.
-- **Consequences:**
-  - Releases happen before arrivals.
-  - All exits happen before admissions, so capacity freed at a ms can be reused at that ms.
-  - An arrival exactly at a deadline counts as within it.
-  - In every same-ms contest, including a claimer and a sitter reaching the same table, the lower id wins.
+- An entry made ready by a kind-7 event is examined in a kind-6 step scheduled at the same ms, so it is processed
+  straight after that event.
+
+**Consequences**
+
+- Releases happen before arrivals, so a seat freed at ms `t` is visible to a searcher arriving at `t`.
+- All exits happen before admissions. So capacity freed at a ms can be reused at that ms, and an arriving agent never
+  overtakes someone already waiting in a FIFO.
+- An arrival exactly at a deadline counts as within it.
+- Within one kind, the lower entity id wins every same-ms contest, including a claimer and a sitter reaching the same
+  table.
+- Across kinds, the kind order decides. For example, an ask that ends at ms `t` is decided before a searcher who
+  arrives at `t`.
 
 **Chunk independence**
 
@@ -1017,16 +1162,17 @@ default, min, max, step and help text. From it are generated:
 3. `crowd.peakTime`
 4. `reserve.shareMinEmpty`
 
+`windowEnd` and `peakTime` are always clamped into their dependent ranges, so a bad window or peak can never occur.
+
 **Blocking.** A message names the settings, and the combination cannot run:
 
 - any stall frontage < 1,800 mm;
-- `crowd.peakTime` outside the window;
-- a window shorter than 30 min;
 - an all-zero group mix;
 - a group size `s > 2·layout.seatsPerSide` with a non-zero share (a party must fit at one table, decision #3). A
   one-click fix moves those shares onto size `2·seatsPerSide`.
-- entrance overlaps the tray return: `0.70W − 1000 < 3000 + Q + 3500`;
-- doors overlap: `0.85W − 1000 < 0.70W + 1000`.
+- door conflicts, using the §3.4 integer centres `xIn = Math.round(0.70·W)` and `xOut = Math.round(0.85·W)`:
+  - entrance overlaps the tray return when `xIn − 1000 < 3000 + Q + 3500`;
+  - doors overlap when `xOut − 1000 < xIn + 1000`.
 
 **Warnings**, shown next to the setting and in the batch header:
 
@@ -1040,7 +1186,7 @@ default, min, max, step and help text. From it are generated:
 
 | Quantity | Formula |
 |---|---|
-| Peak-hour arrivals/min | `N·[p·(Φ((b−μ)/σ) − Φ((a−μ)/σ)) / (Φ(β) − Φ(α)) + (1−p)·(b−a)/T] / 60`, with `[a, b] = [peakTime − 30 min, peakTime + 30 min] ∩ [0, T]` and `μ, σ, α, β` as in §5.1 |
+| Peak-hour arrivals/min | `N·[p·(Φ((b−μ)/σ) − Φ((a−μ)/σ)) / (Φ(β) − Φ(α)) + (1−p)·(b−a)/T] / (b − a)`, with `[a, b] = [μ − 30 min, μ + 30 min] ∩ [0, T]`, `b − a` in minutes, and `μ, σ, α, β` as in §5.1 |
 | Stall capacity/min | `S / serviceMean` |
 | Seat-turnover upper bound/min | `2kCR / (eat.mean + eat.linger + 0.1 min)`, labelled *"upper bound: ignores waiting for the slowest groupmate, holds and table fragmentation"* |
 
@@ -1071,10 +1217,10 @@ Help text for Reservation-friendly:
 
 ### 9.4 Persistence, sharing and versions
 
-- **URL hash:** `#v=1&…` holds only the non-default values plus the seed.
+- **URL hash:** `#v=1&m={MODEL_VERSION}&…` holds the model version, the non-default values and the seed.
   - `groupMix` is written as `25.30.20.15.5.5`.
   - Times are written as `HHMM`.
-- **Settings code:** a compact base64url string of the same content.
+- **Settings code:** a compact base64url string of exactly the same content, including `m`.
   - The ⚙ drawer has **Copy settings code**, **Copy link** (`location.href` with the hash) and a **Load settings
     code** field. The field accepts a bare code or any URL containing `#v=…`.
   - A valid code replaces the drawer values and marks the run dirty.
@@ -1085,7 +1231,11 @@ Help text for Reservation-friendly:
   isn't available in this browser"*.
 - **Loading rules:**
   - Unknown keys are ignored, and out-of-range values are clamped, with a notice.
-  - A loaded blocked combination resets the offending keys to their defaults, with a notice.
+  - A loaded blocked combination is repaired, with a notice:
+    - a group-mix / `seatsPerSide` conflict applies the one-click fix, moving shares onto size `2k`;
+    - any other conflict resets the listed `layout.*` keys to their defaults, then re-clamps in §9.2 order.
+  - Loading a link, code or JSON whose `m` differs from the running `MODEL_VERSION` applies it and shows the
+    model-version notice below.
 - **Apply on Restart.** Changing a setting marks the run dirty, and settings apply on **Restart**, so a run is exactly
   one config and seed. The A slider is the one exception (§11.1).
 - **Model version.** `MODEL_VERSION` (an integer in `src/sim/version.ts`) is bumped whenever sim behavior changes. It
@@ -1140,13 +1290,16 @@ Help text for Reservation-friendly:
   - For `df ≥ 30`, use the Cornish–Fisher expansion with `z = 1.959964`:
     `t ≈ z + (z³+z)/(4df) + (5z⁵+16z³+3z)/(96df²) + (3z⁷+19z⁵+17z³−15z)/(384df³)`.
   - No interval is shown when `n_used < 10`.
-  - If all paired differences are equal, show *"identical in all n lunches"*.
+  - If all paired differences are 0, show *"identical in all n lunches"*.
+  - If they are all equal but not 0, show the difference with *"the same in every lunch"* and no interval.
   - If more than half are exactly 0, append *"mostly ties — interval approximate"*.
   - Each interval is shown with its half-width and `n`.
 - **One sign everywhere: *free-flow advantage*.**
   - It is `A − B` for lower-is-better metrics and `B − A` for higher-is-better metrics, where B is the 0% run.
   - **Positive always means free flow did better.**
   - It is used in the live strip, batch charts, the sensitivity chart and the CSV.
+  - Diagnostics (§7.4) have no better direction. They show the A and B values side by side, with no free-flow
+    advantage, interval, win count or difference chart.
 - **Win count:** *"Free flow better in W · tied in T · reservation better in L (of n)"*.
   - A tie is exact equality of the two per-run values.
   - There are no win counts for diagnostics or the baseline.
@@ -1162,6 +1315,8 @@ Help text for Reservation-friendly:
 - **Clear difference:** *"At {p}% reservation, {metric} was {|diff|} {unit} {better|worse} under free flow (95% CI
   {lo} to {hi}) across {n} paired lunches. Free flow better in W, tied in T, reservation better in L."*
 - **CI includes 0:** *"At {p}% reservation, these {n} lunches show no clear difference in {metric}."*
+- **Too few lunches:** *"At {p}% reservation, {n_used} usable lunches are too few for an interval; mean difference
+  {diff} {unit}."*
 - Primary endpoints come first, labelled *primary*. Everything else is labelled *secondary* or *diagnostic*.
 
 ### 10.5 Execution
@@ -1189,20 +1344,22 @@ Help text for Reservation-friendly:
 ### 10.7 Outputs
 
 - Primary endpoint cards, with sentences, intervals and win/tie/loss.
-- Difference charts, one per metric, against reserve level.
+- Difference charts, one per primary and secondary metric, against reserve level.
 - Group-size and reserver-cohort tables.
 - The sensitivity chart.
 - Every chart has a *Show table* toggle.
-- **CSV export:** one row per run.
-  - Columns: seed, reserve fraction, sweep value, peak-window start, every metric, the per-size and per-cohort
-    metrics, and group and person counts per size.
+- **CSV export.**
+  - One row per run, with RunMetrics: seed, reserve fraction, sweep value, every RunMetric, the per-size metrics, and
+    group and person counts per size.
+  - One `pair_` row per (seed, level ≠ 0) pair, with PairMetrics: peak-window start, P3, peak-window seat-time shares
+    and the per-cohort metrics (§7.7).
   - The header comment holds the settings JSON, `MODEL_VERSION` and the build SHA.
   - Numbers use `Number.prototype.toString`; timestamps are ISO 8601 UTC.
 
 ### 10.8 Precomputed evidence (shipped with the page)
 
-- **Build step.** `npm run precompute` runs the default reservation sweep (150 runs) in Node and embeds each run's
-  metrics and run hash (≈ 50 KB JSON) in `index.html`.
+- **Build step.** `npm run precompute` runs the default reservation sweep (150 runs) in Node. It embeds each run's
+  RunMetrics and run hash, plus each pair's PairMetrics (≈ 60 KB JSON), in `index.html`.
 - **Evidence line.** When the applied config equals the defaults (canonical settings code), the top bar shows an
   **Evidence (30 lunches)** line with the P1 sentence at 100% vs 0%.
 - **Evidence panel.** The line opens the batch view pre-filled and labelled *"Precomputed for the default settings,
@@ -1267,6 +1424,8 @@ A *"Settings changed — Restart to apply"* banner appears while settings are di
 
 - `dt = min(rafDt, 100 ms)`; `simTargetMs += dt × speed`.
 - A and B advance alternately, one tick at a time, toward `simTargetMs`, with at most 8 ms of sim work per frame.
+  The budget is checked only after B has completed the tick A just ran, so A and B always end a frame at the same
+  tick.
 - If that budget is hit, the clock falls behind. The top bar shows *"running at N×"*, and the unmet time is dropped,
   not carried as debt.
 
@@ -1281,6 +1440,8 @@ A *"Settings changed — Restart to apply"* banner appears while settings are di
 
 - Rebuilds both engines at time 0 with the pending settings, and leaves them **paused**.
 - Keeps the camera preset and drops the follow target.
+- The renderer reallocates the dynamic instanced meshes at capacity = the new engine's actual arrivals (≤ totalPeople
+  + 5), and disposes the old geometries, materials and textures. The A-slider release (§11.1) does the same.
 
 **First load**
 
@@ -1348,12 +1509,12 @@ Dismissal is remembered in `localStorage`, inside try/catch. Without storage, th
   | Class | Who |
   |---|---|
   | Claiming a table | claimer or convoy during claim search, and while placing the object |
-  | Queuing | walking to a stall, in a queue, being served, or waiting because every queue is full |
+  | Queuing | from reaching the chosen stall's walkway stop until service end (walking to the slot, in a queue, being served), or waiting at a walkway stop because every queue is full |
   | Searching with food | free-flow searcher |
   | Holding seats | seated, while own party still has members not sitting (both canteens) |
   | Eating | any other seated person, including those waiting for groupmates to finish and those lingering |
   | Walked away | walk-away members holding food, from the decision until they exit; they fade out |
-  | Walking | everyone else: entering, walking with food to a seat, going to the tray return or the exit |
+  | Walking | everyone else: entering and walking to a stall, R6 waiters and others carrying food who are not searching (tray cue), walking with food to a seat, going to the tray return or the exit |
 
 - A walk-away member without food at the decision stays in its buying class until service end, then turns
   *walked away*.
@@ -1373,8 +1534,9 @@ Dismissal is remembered in `localStorage`, inside try/catch. Without storage, th
 **Waiters at nodes**
 
 - People waiting to enter an edge stand back along their incoming edge, 0.6 m apart, by wait rank.
-- Other node waiters (R6 waiters, all-full waiters) stand in a spiral on the node's open side: radius
-  `0.5·ceil(√k)` m, angle `k·137.5°`.
+- Other node waiters (R6 waiters, all-full waiters) stand in a spiral on the node's open side, away from tables and
+  counters. The `j`-th such waiter at a node (`j = 0, 1, …` in order of arrival at the node; this is
+  `view().waitRank`) is drawn at radius `0.5·ceil(√j)` m and angle `j·137.5°`.
 - Tray-return waiters form a line north from the counter, 0.6 m apart, turning west after 4.
 - This is rendering only.
 
@@ -1452,7 +1614,9 @@ shared by both scenes, and the old texture is disposed when re-rasterised.
 3. **Engine exception.** Both engines stop, and a banner shows the message, time, seed and settings code, with a
    **Copy details** button.
 4. **Bad import.** Unparseable JSON or codes, or an unsupported `v`, are rejected whole, and the current settings stay
-   unchanged.
+   unchanged. An inline message appears next to the control used:
+   - for a settings code, the §9.4 message;
+   - for a JSON import, *"This file isn't a valid Canteen Sim settings file or is from a newer version."*
 5. **Batch failure.** Batch cancel and batch errors behave as in §10.5.
 
 ### 11.11 Accessibility and touch
@@ -1468,6 +1632,8 @@ shared by both scenes, and the old texture is disposed when re-rasterised.
 
 - Text contrast is ≥ 4.5:1 in both themes.
 - Stacked bars are labelled directly.
+- Every chart has a *Show table* toggle that renders its series as an HTML table. This includes the live
+  seat-states-over-time panels (§7.6) and all batch charts (§10.7).
 - Each 3D canvas has `role=img` and a label.
 
 **Motion.** Under `prefers-reduced-motion`, camera moves and follow mode cut instead of animating.
@@ -1518,6 +1684,8 @@ engine.series()              // per-minute seat-state and sit-count bins
 engine.progress()            // exited ÷ arrivals
 engine.metrics()             // RunMetrics incl. breakdowns and events per kind; throws unless done
 engine.runHash(); engine.stateHash()
+
+pairMetrics(levelRun, baselineRun): PairMetrics   // pure function in src/sim/metrics.ts (§7.7)
 ```
 
 **`view()` contents**
@@ -1536,8 +1704,13 @@ engine.runHash(); engine.stateHash()
 
 1. **No per-event work proportional to the number of seats, tables, people or nodes.**
    - Seat-state time comes from six per-state seat totals, updated at each state change.
-   - When the clock advances by Δ ms, each total × Δ is added to its Float64 accumulator and to the current
-     minute bin.
+   - When the clock advances by Δ ms, Δ is split at every whole-minute boundary. For each part, each state total ×
+     that part is added to its Float64 accumulator and to that minute's bin. While ≥ 1 stuck searcher exists, it is
+     also added to the §7.3 demand accumulators. This makes the minute bins independent of how the run is stepped.
+   - **Exceptions**, only on a searcher's node arrival:
+     - observation over the node's precomputed visible-table list;
+     - target recomputation over the searcher's memory;
+     - choosing an explore target over intersections.
 2. **Waiting agents never poll.**
    - Each edge-direction keeps a FIFO.
    - An exit, a busy-node release or a link reopening re-examines only the heads of the affected FIFOs.
@@ -1550,6 +1723,11 @@ engine.runHash(); engine.stateHash()
 6. **State lives in typed arrays.** Engine state is in typed arrays indexed by dense ids, and the event queue is a
    binary heap on typed arrays. Times are never stored in `Float32Array`.
 7. **The 1 s budget excludes invariant checks.**
+8. **Memory.**
+   - Minute bins and time series are preallocated Float64Arrays of `ceil(simEnd / 60,000) + 1` minutes.
+   - The rolling "sit starts in the last 60 min" counter is a 60-bin ring buffer of per-minute counts.
+   - No per-event log is kept. The run hash is folded incrementally as each event is processed; the final metrics are
+     folded in at done.
 
 ### 12.3 Stack and boundaries
 
@@ -1594,7 +1772,10 @@ Development is test-driven: every rule gets a failing test first.
 
 - Frontage < 1.8 m is blocked.
 - `seatsPerSide = 2` with a non-zero size-5 share is blocked; with sizes 5 and 6 at 0%, it is accepted.
-- Doors overlapping at `cols ≤ 2` is blocked.
+- Door rules, with `stallCount = 10` and other settings at defaults:
+  - `cols = 1` (W = 12,200 mm) is blocked by both *doors overlap* and *entrance overlaps the tray return*;
+  - `cols = 2` (W = 15,200 mm) is blocked by *entrance overlaps the tray return* only;
+  - `cols = 3` (W = 18,200 mm) is accepted.
 
 **Claims and sharing**
 
@@ -1610,7 +1791,11 @@ Development is test-driven: every rule gets a failing test first.
   - a target chosen before the cutoff is still claimed;
   - with limit 0, only tables visible at entry can be claimed;
   - fallback resets memory and uses the patience start rule.
-- Claim modes: `oneClaimer` members queue on entry; `together` convoy members follow the leader under lane rules.
+- Claim modes: `oneClaimer` members queue on entry; `together` convoy members walk the leader's node sequence under
+  lane rules.
+- Reserver seat assignment: members already holding food at the claim ms are assigned at that ms, in (service-end ms,
+  person id) order, and start walking then. Their assigned seats are `held`.
+- After the cutoff, a pursued target seen occupied at a node arrival causes fallback at that ms.
 
 **Free flow**
 
@@ -1621,7 +1806,7 @@ Development is test-driven: every rule gets a failing test first.
 
 **Seat choice**
 
-- `n = 4` at an empty 6-seat table picks N0, N1, S0, S1.
+- `n = 4` at an empty 6-seat table, with the searcher at seat 0's or seat 1's access node, picks N0, N1, S0, S1.
 - Joiners next to claimers at N0, N1 take S1, S2.
 - Reservers fill the claimer's side first.
 
@@ -1635,15 +1820,31 @@ Development is test-driven: every rule gets a failing test first.
 
 - 1-lane links:
   - no passing inside a link;
-  - alternation works;
-  - every waiter enters within `(m+1)·(T + cap·h)` of starting to wait.
-- A busy node delays a passer by ≤ 3,000 ms per action.
+  - batch alternation works: a batch is formed from the earliest waiter's direction, and later same-direction
+    arrivals wait for the next batch;
+  - **starvation bound:** on a single 1-lane link with continuous two-way arrivals, every waiter enters within
+    `(w + 1)·(T_L + c_L·h) + 5,000·a` ms of starting to wait, where:
+    - `w` = agents registered on the link plus waiters for it (either direction) with a smaller (wait start, person
+      id) at the moment it starts waiting;
+    - `T_L` = the sum of the link's edge travel ms at `min(walkSpeed, traySpeed)`;
+    - `c_L` = the sum of per-lane capacities of the link's edges;
+    - `h` = `headwayMs` at that speed;
+    - `a` = the number of busy-node actions on the link during the wait.
+  - **U-turns:** after a `together`-mode placement on a 1-lane aisle, two followers waiting at adjacent mid-link nodes
+    both turn back, and both leave the link within `2·(T_L + h)` of the place end.
+- A busy node delays a passer by at most the remaining duration of each action in progress there: ≤ 3,000 ms for sit,
+  stand or place, and ≤ 5,000 ms for an ask.
+- **Headway on a short edge:** on the default 256 mm edge from stall 29's walkway stop (7300, 33994) to the concourse
+  intersection, an agent entering at `t` exits at `t + 197`. A follower admitted at `t + 197` exits at `t + 659`.
+- **FIFO order:** an agent that reaches a node never enters ahead of an agent already waiting in that edge-direction's
+  FIFO.
 - A lone walker covers a 30 m seated aisle at 1.3 m/s within 1 ms per edge of `30/1.3` s; a lone tray-carrier at
   1.0 m/s within the same tolerance of 30 s.
 
 **Stalls**
 
 - `queueLength` counts people walking to the stall, and never exceeds `2m`.
+- Two people arriving at a walkway stop never share a position. A walker makes the move-ups it missed on arrival.
 - The all-full re-choose runs every 5,000 ms.
 
 ### 13.2 Layout property tests (fast-check over all §9.1 ranges)
@@ -1662,8 +1863,7 @@ Development is test-driven: every rule gets a failing test first.
 - `arrived = inside + exited`.
 - Lane capacity, link-direction and busy-node rules hold.
 - Nobody sits at a claimed table except its group or valid joiners.
-- `arrivals = seated diners + walk-aways`.
-- Every run reaches `done` by `simEnd`.
+- At done, `arrivals = seated diners + walk-aways`, where seated diners are people with a sit start.
 - `truncated = false` for generated configs with `ρ̄ ≤ 0.8`.
 
 **Bounds**
@@ -1674,16 +1874,24 @@ Development is test-driven: every rule gets a failing test first.
 
 ### 13.4 Model sanity
 
-- **Small crowd.** `totalPeople = 100`, seeds 1–30, A at 100% and B: 0 walk-aways in every run.
-- **Infinite patience.** `totalPeople = 100` with patience 30 min: exactly 0 walk-aways.
+- **Default termination.** At defaults, seeds 1–30, A at 100% and B: every run ends with `truncated = false` and
+  exited = arrivals.
+- **Small crowd.** `totalPeople = 100`, seeds 1–30, A at 100% and B: 0 walk-aways, and *seats blocked while needed*
+  ≤ 1%, in every run.
+- **Maximum patience.** `totalPeople = 100`, `search.patience = 30 min`, seeds 1–30, A at 100% and B: 0 walk-aways in
+  every run.
 - **Crowd size.**
   - `totalPeople ∈ {400, 1000, 1800, 2600}` (nested), seeds 1–30, A at 100% and B separately.
-  - For each consecutive pair, the mean paired increase in walk-aways is ≥ −2·SE.
+  - For each consecutive pair, the mean over seeds of the paired difference in walk-away **count** (larger crowd −
+    smaller crowd) is ≥ −2·SE, where SE = sd(paired differences)/√30.
   - Per-seed monotonicity is never asserted.
-- **Queue aversion.** `queueAversion` 0 vs 5, B only: the stall HHI `Σ(served_s/served)²` is higher at 0 in ≥ 25 of 30
-  seeds.
-- **Little's law.** It holds as an exact integer identity per stall and per run: the ms-sum of people who have
-  reached a slot but not started service equals the sum of their queue waits.
+- **Queue aversion.** `queueAversion` 0 vs 5, B only, seeds 1–30: the stall HHI `Σ(served_s/served)²` is higher at 0
+  in ≥ 25 of 30 seeds.
+- **Little's law.** Two exact integer identities, per stall, on every non-truncated run, with no tolerance:
+  1. the ms-sum of people who have reached a slot but not started service = Σ over them of (service start − queue
+     join);
+  2. the ms-sum of people who have reached a slot but not finished service = Σ over them of (service end − queue
+     join).
 - **M/G/1 module test.** Poisson arrivals, infinite capacity, `ρ = 0.7`, lognormal service with CV 0.5. The mean wait
   over 10⁶ customers is within 5% of `λm²(1+c²)/(2(1−λm))`.
 - **Mechanism test (Reservation-friendly preset, 30 seeds).** People in groups that claimed a table in A have a lower
@@ -1882,7 +2090,7 @@ This ledger is also shown in-app (§11.12).
 | R6 | Free-flow members who get food while their searcher is still searching wait at their stall's walkway (the `search.parallel` option changes this) | Needs an explicit rule |
 | R7 | Queue capacity 12 per stall; people walking to a stall count toward its queue | Finite queue space, no overfill |
 | R8 | `together` claim mode moves as a convoy of individual agents | Keeps lane rules intact |
-| R9 | The headline seat metric is utilization (decision #1), plus *seats blocked while needed*; the old ratio is a diagnostic | The old ratio counted idle claimed seats even when nobody needed them |
+| R9 | The headline seat metric is utilization (P3). *Seats blocked while needed* is secondary; the old ratio is a diagnostic | The old ratio counted idle claimed seats even when nobody needed them |
 | R10 | Time metrics count walk-aways at their give-up time | Removes survivorship bias |
 | R11 | Held seats look empty from afar, and sitting beside anyone requires asking, in both canteens | The same information problem applies to both policies |
 | R12 | Reserver-cohort breakdown | Shows reservers' private gain and the cost to others |
@@ -1892,3 +2100,6 @@ This ledger is also shown in-app (§11.12).
 | R16 | Narrow screens stack A above B (no tabs) | Keeps the side-by-side comparison on phones |
 | R17 | Rings mark kept seats (`held` or `claimedEmpty`) in both canteens alike | The same kind of waiting seat-time looks the same in both |
 | R18 | "Reservation-friendly" preset (renamed, stronger), checked by a mechanism test, never an outcome test | An honest best case for reservation |
+| R19 | All edge entries happen in one admission step. 1-lane links alternate in batches, and U-turns deregister the agent | Removes self-blocking deadlocks and overtaking of waiting agents |
+| R20 | Metrics split into RunMetrics (one run, hashed) and PairMetrics (P3, peak-window shares, cohorts) | Those metrics depend on the paired run |
+| R21 | A reserver's assigned seat is `held` until the member sits; members already holding food are assigned at the claim | Defines seat state and timing for early members |
