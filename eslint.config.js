@@ -6,7 +6,7 @@ export default tseslint.config(
   { ignores: ['node_modules', 'dist', 'coverage'] },
   ...tseslint.configs.recommended,
   {
-    files: ['src/sim/**/*.ts', 'src/config/**/*.ts'],
+    files: ['src/sim/**/*.ts', 'src/config/**/*.ts', 'src/batch/stats.ts'],
     rules: {
       'no-restricted-syntax': [
         'error',
