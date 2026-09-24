@@ -5,6 +5,7 @@ import { META, getSetting, setSetting, type SettingMeta } from '../config/meta';
 import type { Config } from '../config/schema';
 import { encodeHash, parseShared, settingsCode } from '../config/url';
 import { dnormcdf } from '../sim/dmath';
+import { canDownload, saveText } from './download';
 import { num } from './format';
 import { MSG } from './labels';
 import { copyText, dirty, editPending, focusSetting, note, pending, restart, storage, validation } from './store';
@@ -112,12 +113,9 @@ function Sharing() {
     for (const n of r.notices) note(n);
     if (r.modelNotice) note(MSG.modelNotice(r.modelNotice.from, r.modelNotice.to));
   };
-  const download = (name: string, text: string, type: string) => {
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([text], { type }));
-    a.download = name;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  const download = async (name: string, text: string, type: string) => {
+    const m = await saveText(name, text, type);
+    if (m) setMsg(m);
   };
   return (
     <section class="share" aria-label="Share and save">
@@ -133,7 +131,7 @@ function Sharing() {
       </form>
       {err && <p class="error-text" role="alert">{err}</p>}
       <div class="row">
-        <button type="button" onClick={() => download('canteen-sim-settings.json', exportJson(pending.value), 'application/json')}>Download JSON</button>
+        {canDownload.value && <button type="button" onClick={() => download('canteen-sim-settings.json', exportJson(pending.value), 'application/json')}>Download JSON</button>}
         <button type="button" onClick={() => copy(exportJson(pending.value))}>Copy JSON</button>
         <label class="filebtn" for="import-json">Import JSON
           <input id="import-json" type="file" accept="application/json,.json" onChange={async (e) => {

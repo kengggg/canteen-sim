@@ -11,6 +11,7 @@ import { validate } from '../config/validate';
 import { MODEL_VERSION } from '../sim/version';
 import { batch, cancelBatch, perRunMs, startBatch, workerCount } from './batchrun';
 import { diffChart } from './charts';
+import { canDownload, saveText } from './download';
 import { EVIDENCE, evidenceBatch } from './evidence';
 import { num } from './format';
 import { CHART_CAPTION, MSG } from './labels';
@@ -172,12 +173,9 @@ function Csv({ r }: { r: BatchResult }) {
   const text = () => toCsv(r, applied.value, { model: MODEL_VERSION, sha: __BUILD_SHA__, exportedAt: new Date().toISOString() });
   return (
     <div class="csv row">
-      <button type="button" onClick={() => {
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(new Blob([text()], { type: 'text/csv' }));
-        a.download = 'canteen-sim-batch.csv';
-        a.click();
-      }}>Download CSV</button>
+      {canDownload.value && (
+        <button type="button" onClick={async () => { const m = await saveText('canteen-sim-batch.csv', text(), 'text/csv'); if (m) setMsg(m); }}>Download CSV</button>
+      )}
       <button type="button" onClick={async () => { const t = text(); if (await copyText(t)) setMsg(MSG.copied); else { setMsg(MSG.copyFailed); setShown(t); } }}>Copy CSV</button>
       {msg && <span class="muted" role="status">{msg}</span>}
       {shown && <textarea class="copybox" readOnly value={shown} onFocus={(e) => (e.target as HTMLTextAreaElement).select()} />}

@@ -9,7 +9,7 @@ Everything else, every random draw included, is identical. Evidence comes from m
 confidence intervals on four primary endpoints fixed in advance: walk-aways, time from entrance to seat (or giving
 up), peak seat utilization and peak throughput.
 
-- **Live page (private claude.ai artifact):** see [Publishing](#publishing) for the link.
+- **Live page (private claude.ai artifact):** https://claude.ai/artifact/7NBZqCJ7HxeGJ2LCNSnfNv
 - **Design spec:** [`docs/superpowers/specs/2026-09-24-canteen-sim-design.md`](docs/superpowers/specs/2026-09-24-canteen-sim-design.md)
 - **Assumptions and fairness ledger:** spec §15, also shown in the app's **Assumptions** panel.
 - **Implementation plans:** [`docs/superpowers/plans/`](docs/superpowers/plans/)
@@ -47,7 +47,9 @@ are derived from the live seed (spec §10.1).
 `dist/index.html` is published as a **private claude.ai artifact**. Republishing goes to the same artifact URL so shared
 links never change.
 
-- Artifact: _recorded here on first publish_
+- Artifact: https://claude.ai/artifact/7NBZqCJ7HxeGJ2LCNSnfNv (private; share it from the page's Share menu)
+- Update: `npm run build:artifact`, then republish `dist/artifact.html` to that URL with the `downloads`
+  capability declared (the viewer blocks page-started downloads; saves go through the capability).
 
 Inside the artifact sandbox, downloads and `#key=value` links are blocked: use **Copy** (CSV, JSON, settings code) and
 share settings with the settings code. Batch runs fall back to time-sliced main-thread work if workers are unavailable.
