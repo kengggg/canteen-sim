@@ -1,25 +1,14 @@
 import { defaultConfig } from '../../src/config/schema';
-import { Sim } from '../../src/sim/engine';
+import type { Sim } from '../../src/sim/engine';
+import { traced, type Trace } from './helpers/run';
 
-type Tr = { ev: string; ms: number; a: number; b: number; c: number; snap?: unknown };
+type Tr = Trace & { snap?: unknown };
 
 function runB(seed = 1, onTrace?: (s: Sim, t: Tr) => void) {
-  const traces: Tr[] = [];
-  let sim: Sim;
-  sim = new Sim(defaultConfig(), {
-    seed,
-    reserveFraction: 0,
-    trace: (ev: string, a: number, b: number, c: number) => {
-      const t = { ev, ms: sim.world.now, a, b, c };
-      traces.push(t);
-      onTrace?.(sim, t);
-    },
-  });
-  sim.advanceTo(Infinity);
-  return { sim, w: sim.world, traces };
+  return traced(defaultConfig(), { seed, reserveFraction: 0 }, onTrace);
 }
 
-const B = runB(1, (s, t) => {
+const B = runB(1, (s, t: Tr) => {
   if (t.ev !== 'commit') return;
   // At commit, every member's seat is held on that table.
   const w = s.world;
@@ -82,7 +71,7 @@ test('the first member with food becomes the searcher (ties to the lowest id)', 
 test('all n seats are held from commit', () => {
   const commits = B.traces.filter((t) => t.ev === 'commit');
   expect(commits.length).toBeGreaterThan(0);
-  for (const t of commits) expect((t.snap as boolean[]).every(Boolean)).toBe(true);
+  for (const t of commits as Tr[]) expect((t.snap as boolean[]).every(Boolean)).toBe(true);
 });
 
 test('searchers ask at occupied tables, and a refused table is not retried for 180 s', () => {
