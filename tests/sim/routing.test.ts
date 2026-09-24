@@ -80,3 +80,12 @@ test('degenerate layouts build and connect: 1 row, 1 stall', () => {
     for (const n of g.nodes) expect(r.dist(g.entranceNode, n.id)).toBeLessThan(INF);
   }
 });
+
+test('options come back sorted by next node id, then link id', () => {
+  for (let at = 0; at < G.nodes.length; at += 5) {
+    for (const t of [G.stallNode[0], G.stallNode[29], G.seatNode[300], G.exitNode]) {
+      const o = R.options(at, t);
+      for (let i = 1; i < o.length; i++) expect(o[i - 1].next < o[i].next || (o[i - 1].next === o[i].next && o[i - 1].link < o[i].link)).toBe(true);
+    }
+  }
+});

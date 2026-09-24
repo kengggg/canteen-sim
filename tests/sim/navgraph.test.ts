@@ -56,3 +56,32 @@ test('links run routing node to routing node', () => {
     expect(l.lengthMm).toBe(l.edges.reduce((s, e) => s + G.edges[e].lengthMm, 0));
   }
 });
+
+test('node ids follow spec §4.1 order: routing (line, x), then line stops (line, x), then left-walkway stops (y)', () => {
+  const group = (n: (typeof G.nodes)[number]) => (n.routing ? 0 : n.hLine >= 0 ? 1 : 2);
+  for (let i = 1; i < G.nodes.length; i++) {
+    const a = G.nodes[i - 1], b = G.nodes[i];
+    const ga = group(a), gb = group(b);
+    expect(ga <= gb).toBe(true);
+    if (ga !== gb) continue;
+    if (ga === 2) expect(a.y < b.y).toBe(true);
+    else expect(a.hLine < b.hLine || (a.hLine === b.hLine && a.x < b.x)).toBe(true);
+  }
+});
+
+test('a merged cluster without an intersection takes the smallest coordinate (stall 8 stop merges with seat 19)', () => {
+  const n = G.nodes[G.stallNode[8]];
+  expect(n.roles.some((r) => r.kind === 'seat' && r.seat === 19)).toBe(true);
+  expect(n.x).toBe(19100);
+});
+
+test('default graph fingerprint is pinned (ids, coordinates, edges)', () => {
+  let h = 0x811c9dc5;
+  const mix = (v: number) => { for (let s = 0; s < 32; s += 8) h = Math.imul(h ^ ((v >>> s) & 0xff), 0x01000193) >>> 0; };
+  for (const n of G.nodes) { mix(n.id); mix(n.x); mix(n.y); mix(n.routing ? 1 : 0); }
+  for (const e of G.edges) { mix(e.a); mix(e.b); mix(e.lanes); mix(e.link); }
+  expect([G.nodes.length, G.routingIds.length, G.edges.length, G.links.length]).toEqual([492, 134, 601, 243]);
+  expect(h).toBe(GRAPH_FINGERPRINT);
+});
+
+const GRAPH_FINGERPRINT = 1767556017;

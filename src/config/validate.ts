@@ -4,17 +4,23 @@ import { buildLayout, type LayoutParams, MIN_FRONTAGE_MM } from '../sim/layout';
 export interface Issue { code: string; message: string; settings: string[] }
 export interface Validation { blocking: Issue[]; warnings: Issue[] }
 
-const snap = (metres: number, stepMm: number) => Math.round((metres * 1000) / stepMm) * stepMm;
+/** Clamp to [lo, hi]; NaN and non-finite values fall back to the default. */
+const clamp = (v: number, lo: number, hi: number, dflt: number) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : dflt);
+const int = (v: number, lo: number, hi: number, dflt: number) => clamp(Math.round(v), lo, hi, dflt);
+/** Metres → integer mm on a `stepMm` grid, clamped to the §9.1 range (in mm). */
+const snap = (metres: number, stepMm: number, loMm: number, hiMm: number, dfltMm: number) =>
+  int(Math.round((metres * 1000) / stepMm) * stepMm, loMm, hiMm, dfltMm);
 
+/** Layout settings → integer layout parameters, rounded to their steps and clamped to the §9.1 ranges. */
 export function toLayoutParams(c: Config): LayoutParams {
   return {
-    cols: c.layout.cols,
-    rows: c.layout.rows,
-    seatsPerSide: c.layout.seatsPerSide,
-    verticalAisleMm: snap(c.layout.verticalAisle, 50),
-    horizontalAisleMm: snap(c.layout.horizontalAisle, 50),
-    stallCount: c.layout.stallCount,
-    queueDepthMm: snap(c.layout.queueDepth, 100),
+    cols: int(c.layout.cols, 1, 20, 10),
+    rows: int(c.layout.rows, 1, 20, 10),
+    seatsPerSide: int(c.layout.seatsPerSide, 2, 4, 3),
+    verticalAisleMm: snap(c.layout.verticalAisle, 50, 600, 3000, 1200),
+    horizontalAisleMm: snap(c.layout.horizontalAisle, 50, 600, 3000, 750),
+    stallCount: int(c.layout.stallCount, 1, 60, 30),
+    queueDepthMm: snap(c.layout.queueDepth, 100, 3200, 10000, 5000),
   };
 }
 
@@ -26,7 +32,7 @@ export function validate(c: Config): Validation {
   const k = p.seatsPerSide;
 
   if (L.stalls.some((s) => s.frontage < MIN_FRONTAGE_MM)) {
-    blocking.push({ code: 'frontage', message: 'Stalls are narrower than 1.8 m. Use fewer stalls or a larger hall.', settings: ['layout.stallCount'] });
+    blocking.push({ code: 'frontage', message: 'Stalls are narrower than 1.8 m. Use fewer stalls or a larger hall.', settings: ['layout.stallCount', 'layout.cols', 'layout.rows', 'layout.seatsPerSide', 'layout.verticalAisle', 'layout.horizontalAisle', 'layout.queueDepth'] });
   }
   if (c.crowd.groupMix.every((w) => w === 0)) {
     blocking.push({ code: 'mixZero', message: 'The group mix needs at least one non-zero size.', settings: ['crowd.groupMix'] });

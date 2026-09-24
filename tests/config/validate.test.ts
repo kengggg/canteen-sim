@@ -65,3 +65,28 @@ test('off-step metre values snap to 50 mm so geometry stays integer', () => {
   const p = toLayoutParams(c);
   expect([p.verticalAisleMm, p.horizontalAisleMm, p.queueDepthMm]).toEqual([1250, 800, 5000]);
 });
+
+test('non-integer, NaN and out-of-range layout values are rounded and clamped into §9.1 ranges', () => {
+  const c = defaultConfig();
+  c.layout.cols = 10.5;
+  c.layout.rows = 2.5;
+  c.layout.seatsPerSide = Number.NaN;
+  c.layout.stallCount = 30.5;
+  c.layout.verticalAisle = 0.5;
+  c.layout.horizontalAisle = 99;
+  c.layout.queueDepth = 2.0;
+  const p = toLayoutParams(c);
+  expect(p).toEqual({ cols: 11, rows: 3, seatsPerSide: 3, verticalAisleMm: 600, horizontalAisleMm: 3000, stallCount: 31, queueDepthMm: 3200 });
+  expect(() => validate(c)).not.toThrow();
+  c.layout.cols = Number.NaN;
+  c.layout.stallCount = 0;
+  expect(toLayoutParams(c).cols).toBe(10);
+  expect(toLayoutParams(c).stallCount).toBe(1);
+});
+
+test('frontage issue lists every layout setting that drives stall frontage', () => {
+  const c = defaultConfig();
+  c.layout.rows = 1;
+  const issue = validate(c).blocking.find((i) => i.code === 'frontage')!;
+  expect(issue.settings).toEqual(expect.arrayContaining(['layout.stallCount', 'layout.cols', 'layout.rows']));
+});
