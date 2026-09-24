@@ -9,10 +9,20 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
+/** A fresh context always shows the first-visit panel after mount; wait for it, then close it. */
 async function dismissHowTo(page: Page) {
-  const close = page.getByRole('dialog').getByRole('button', { name: 'Close' });
-  if (await close.count()) await close.click();
+  const close = page.getByRole('dialog', { name: 'How this works' }).getByRole('button', { name: 'Close' });
+  await close.click({ timeout: 15_000 });
 }
+
+test('the How this works panel shows on the first visit only', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('dialog', { name: 'How this works' })).toBeVisible();
+  await dismissHowTo(page);
+  await page.reload();
+  await page.waitForTimeout(500);
+  await expect(page.getByRole('dialog', { name: 'How this works' })).toHaveCount(0);
+});
 
 test('loads without console errors; skip to 12:30 then play 120 frames at 120×', async ({ page }) => {
   const errors = watchErrors(page);
@@ -43,8 +53,7 @@ test('settings round-trip through the URL and through the settings code', async 
   expect(cfg.crowd.totalPeople).toBe(900);
   expect(cfg.seed).toBe(7);
   const p2 = await context.newPage();
-  await p2.goto('/');
-  await dismissHowTo(p2);
+  await p2.goto('/'); // same context: the first-visit panel was already dismissed
   await p2.getByRole('button', { name: 'Settings' }).click();
   await p2.fill('#load-code', 'http://x.test/#v=1&m=1&seed=9&crowd.totalPeople=1200');
   await p2.getByRole('button', { name: 'Load', exact: true }).click();
