@@ -58,6 +58,10 @@ export interface View {
   waitKind: Uint8Array; // 0 none, 1 edge FIFO, 2 node spiral, 3 tray line
   waitRank: Int32Array;
   waitNode: Int32Array;
+  /** For edge-FIFO waiters: the node they want to walk toward. */
+  waitToward: Int32Array;
+  /** Seat id while seated (sitting, eating, standing), else −1. */
+  seat: Int32Array;
   isClaimer: Uint8Array;
   tableClaimed: Uint8Array;
   tableComplete: Uint8Array;
@@ -335,7 +339,7 @@ export class Sim implements Engine {
       active: new Uint8Array(P), cls: new Uint8Array(P), tray: new Uint8Array(P), walkedAway: new Uint8Array(P), since: new Float64Array(P),
       x0: new Float32Array(P), y0: new Float32Array(P), x1: new Float32Array(P), y1: new Float32Array(P),
       t0: new Float64Array(P), t1: new Float64Array(P), laneOffset: new Float32Array(P), leader: new Int32Array(P),
-      waitKind: new Uint8Array(P), waitRank: new Int32Array(P), waitNode: new Int32Array(P), isClaimer: new Uint8Array(P),
+      waitKind: new Uint8Array(P), waitRank: new Int32Array(P), waitNode: new Int32Array(P), waitToward: new Int32Array(P), seat: new Int32Array(P), isClaimer: new Uint8Array(P),
       tableClaimed: new Uint8Array(T), tableComplete: new Uint8Array(T), tableObject: new Uint8Array(T), tableClaimSince: new Float64Array(T),
       tableRing: new Uint8Array(T), seatState: new Uint8Array(S),
     });
@@ -350,6 +354,8 @@ export class Sim implements Engine {
       v.waitKind[p] = 0;
       v.waitRank[p] = -1;
       v.waitNode[p] = -1;
+      v.waitToward[p] = -1;
+      v.seat[p] = -1;
       v.leader[p] = -1;
       v.laneOffset[p] = 0;
       if (!active) continue;
@@ -359,6 +365,7 @@ export class Sim implements Engine {
       v.walkedAway[p] = grp.walkedAway && (w.hasFood[p] || w.st.serviceEndMs[p] >= 0) ? 1 : 0;
       v.since[p] = w.phaseSince[p];
       v.isClaimer[p] = grp.claimer === p ? 1 : 0;
+      if (ph === PH.SITTING || ph === PH.EATING || ph === PH.STANDING) v.seat[p] = w.seat[p];
       const e = w.mv.edge[p];
       if (e >= 0) {
         const edge = G.edges[e];
@@ -379,6 +386,9 @@ export class Sim implements Engine {
         if (w.mv.wantEd[p] >= 0) {
           v.waitKind[p] = 1;
           v.waitRank[p] = w.mv.waitRank(p);
+          const ed = w.mv.wantEd[p];
+          const we = G.edges[ed >> 1];
+          v.waitToward[p] = ed & 1 ? we.a : we.b;
         } else if (ph === PH.TRAY_WAIT) {
           v.waitKind[p] = 3;
           v.waitRank[p] = w.trayFifo.indexOf(p);
