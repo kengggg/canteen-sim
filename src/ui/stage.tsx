@@ -81,9 +81,10 @@ export function Stage() {
       if (renderer && webgl.value === 'ok') {
         const views = [controller.A.view(), controller.B.view()] as const;
         if (cameraMode.value === 'follow') {
+          // Retry at most every 500 ms when nobody is inside both canteens (before arrivals, after everyone left).
           if (!followed && t - pickTimer > 500) {
-            pickTimer = t;
             pickFollowGroup();
+            if (!followed) pickTimer = t;
           }
           if (followed) {
             const f = followed;
@@ -133,8 +134,11 @@ export function Stage() {
     renderer.colorByGroup = colorByGroup.value;
     renderer.setSeatTints(seatTints.value);
     renderer.reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (cameraMode.value !== 'follow') renderer.setMode(cameraMode.value);
-    else { renderer.mode = 'follow'; followed = null; }
+    // Entering follow mode keeps any group the render loop already picked; leaving it drops the group.
+    if (cameraMode.value !== 'follow') {
+      renderer.setMode(cameraMode.value);
+      followed = null;
+    } else renderer.mode = 'follow';
   }, [linked.value, colorByGroup.value, seatTints.value, cameraMode.value]);
 
   // Theme tokens change with data-theme (ours or the host's) or the system scheme; see App's observer.
