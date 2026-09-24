@@ -56,7 +56,7 @@ const mean = (xs: (number | null)[]) => {
 };
 
 /** Pair every level run with its 0% baseline (same seed and sweep value); compute PairMetrics and statistics. */
-export function aggregate(kind: BatchResult['kind'], jobs: Job[], results: RunResult[], setting: string | null = null): BatchResult {
+export function aggregate(kind: BatchResult['kind'], jobs: Job[], results: RunResult[], setting: string | null = null, precomputed?: Map<string, PairMetrics>): BatchResult {
   const byKey = new Map(results.map((r) => [r.key, r]));
   const n = Math.max(...jobs.map((j) => j.seedIndex)) + 1;
   const levelKeys = new Map<string, { fraction: number; value: number | null }>();
@@ -75,7 +75,7 @@ export function aggregate(kind: BatchResult['kind'], jobs: Job[], results: RunRe
     for (let i = 0; i < n; i++) {
       const A = lvRuns[i], B = find(lv.value, 0, i);
       if (!A || !B) { pms.push(null); continue; }
-      const pm = pairMetrics(A.pair, B.pair, lv.fraction);
+      const pm = precomputed?.get(A.key) ?? pairMetrics(A.pair, B.pair, lv.fraction);
       pms.push(pm);
       pairs.push({ seedIndex: i, seed: A.seed, fraction: lv.fraction, value: lv.value, pm });
     }
