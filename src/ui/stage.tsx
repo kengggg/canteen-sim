@@ -6,6 +6,7 @@ import { clock } from './format';
 import { CANTEEN_A, CANTEEN_B, MSG } from './labels';
 import { Legend } from './legend';
 import { ASlider } from './slider';
+import { ViewControls } from './viewcontrols';
 import {
   applied, cameraMode, colorByGroup, controller, frameTick, hover, linked, playing, seatTints, theme, tick, webgl,
 } from './store';
@@ -114,6 +115,7 @@ export function Stage() {
   // Keep renderer options in sync with the UI signals.
   useEffect(() => {
     if (!renderer) return;
+    if (renderer.linked && !linked.value && renderer.orbits) renderer.orbits[1] = { ...renderer.orbits[0] };
     renderer.linked = linked.value;
     renderer.colorByGroup = colorByGroup.value;
     renderer.setSeatTints(seatTints.value);
@@ -133,6 +135,7 @@ export function Stage() {
 
   return (
     <section class="stage" aria-label="Canteens">
+      <ViewControls />
       <canvas ref={canvasRef} class="stage-canvas" aria-hidden="true" />
       <Pane side={0} boxRef={boxA} />
       <Pane side={1} boxRef={boxB} />
@@ -165,7 +168,7 @@ function Pane({ side, boxRef }: { side: 0 | 1; boxRef: { current: HTMLDivElement
         {webgl.value === 'none' && <p class="viewport-msg">{MSG.noWebgl}</p>}
         {webgl.value === 'lost' && (
           <p class="viewport-msg">
-            {MSG.contextLost} — <button type="button" class="linklike" onClick={() => location.reload()}>{MSG.restore}</button>
+            {MSG.contextLost} — <button type="button" class="linklike" onClick={() => { try { renderer?.renderer.forceContextRestore(); } catch { /* the browser restores it when it can */ } }}>{MSG.restore}</button>
           </p>
         )}
         {status && <p class="viewport-status">{status}</p>}

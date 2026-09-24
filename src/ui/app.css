@@ -301,6 +301,22 @@ fieldset.plain {
   border-radius: 2px;
 }
 
+.viewcontrols {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  align-items: center;
+  font-size: var(--fs-1);
+  position: relative;
+  z-index: 1;
+}
+.viewcontrols label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 /* ---------------------------------------------------------------- live counters */
 .live {
   display: grid;
