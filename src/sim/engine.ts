@@ -1,11 +1,13 @@
 import type { Config } from '../config/schema';
 import * as A from './agents';
 import { MINUTE_MS, STATES } from './metrics';
+import type { PairInput } from './pairmetrics';
 import { computeRunMetrics, type RunMetrics } from './runmetrics';
 import { CLS, EV, PH } from './types';
 import { World, type EngineOpts } from './world';
 
 export type { RunMetrics } from './runmetrics';
+export { pairMetrics, type PairInput, type PairMetrics } from './pairmetrics';
 
 /** Static geometry for the renderer, in plan metres (spec §12.1). */
 export interface StaticLayout {
@@ -101,6 +103,7 @@ export interface Engine {
   series(): Series;
   progress(): number;
   metrics(): RunMetrics;
+  pairInput(): PairInput;
   runHash(): number;
   stateHash(): number;
 }
@@ -231,6 +234,35 @@ export class Sim implements Engine {
   metrics(): RunMetrics {
     if (!this.world.done || !this.cachedMetrics) throw new Error('metrics() is only available when the run is done');
     return this.cachedMetrics;
+  }
+
+  pairInput(): PairInput {
+    const w = this.world;
+    if (!w.done) throw new Error('pairInput() is only available when the run is done');
+    const P = w.pop.personCount;
+    const G = w.groups.length;
+    const e2s = new Float64Array(P).fill(-1);
+    const f2s = new Float64Array(P).fill(-1);
+    const walked = new Uint8Array(P);
+    for (let p = 0; p < P; p++) {
+      const g = w.groupOf(p);
+      const sit = w.sitStartMs[p];
+      const outcome = sit >= 0 ? sit : g.walkedAway ? g.walkAwayMs : -1;
+      if (outcome >= 0) e2s[p] = outcome - w.entranceMs[p];
+      const se = w.st.serviceEndMs[p];
+      if (outcome >= 0 && se >= 0 && se <= outcome) f2s[p] = outcome - se;
+      walked[p] = g.walkedAway ? 1 : 0;
+    }
+    const claimed = new Uint8Array(G), fb = new Uint8Array(G);
+    for (let g = 0; g < G; g++) {
+      claimed[g] = w.groups[g].claimed ? 1 : 0;
+      fb[g] = w.groups[g].fallback ? 1 : 0;
+    }
+    return {
+      seats: w.pc.L.seats.length, endMs: w.now, bins: w.clock.bins.slice(),
+      groupReserveDraw: w.pop.reserveDraw, groupClaimed: claimed, groupFallback: fb, groupSize: w.pop.size,
+      personGroup: w.pop.group, e2sMs: e2s, f2sMs: f2s, walkedAway: walked,
+    };
   }
 
   runHash(): number {
