@@ -203,7 +203,8 @@ export class Sim implements Engine {
   advanceTo(simMs: number): void {
     const w = this.world;
     if (w.done) return;
-    const limit = Math.min(simMs, w.simEnd);
+    // Integer ms only (spec §3.0): a fractional target must not leave the clock between two ms.
+    const limit = Math.min(Math.floor(simMs), w.simEnd);
     while (!w.done && w.q.size > 0 && w.q.peekMs() <= limit) this.processOne();
     if (w.done) {
       this.finish();

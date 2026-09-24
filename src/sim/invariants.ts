@@ -65,6 +65,8 @@ export function checkInvariants(w: World): void {
     if (e >= 0 && G.edges[e].lanes === 1 && (mv.regLink[p] !== G.edges[e].link || mv.regDir[p] !== mv.dir[p])) fail(`person ${p} on 1-lane edge ${e} unregistered`);
   }
   for (let n = 0; n < G.nodes.length; n++) if (mv.busyCount[n] < 0) fail(`node ${n} busy count negative`);
+  // Liveness (§4.2 rule 1): outside a pending kind-6 step, no FIFO head could enter now.
+  if (!w.admitIsPending() && mv.admissibleHeads() > 0) fail('a FIFO head could enter but was not admitted');
 
   if (w.done && !w.truncated) {
     let seated = 0;

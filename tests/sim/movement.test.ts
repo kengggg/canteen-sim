@@ -212,3 +212,18 @@ test('after a placement on a 1-lane aisle, two followers at adjacent mid-link no
   expect(s.mv.linkDir(G.edges[P.edgeBetween(v0, s0)].link)).toBe(0);
   expect(violations).toBe(0);
 });
+
+test('a head blocked only by an opposite waiter enters as soon as that waiter withdraws', () => {
+  const s = sim();
+  const east = hPath(10175, 8600, 11600); // [v0, s0, s1, s2, v1]
+  const west = [...east].reverse();
+  s.at(100, () => s.mv.busy(east[3], 1)); // s2 busy for a long action
+  s.at(60_000, () => s.mv.busy(east[3], -1));
+  s.add(0, west, 200); // W waits at v1 (far node s2 busy); a batch {W} forms
+  s.add(1, east, 500); // F at v0: blocked only by rule 3 (opposite waiter W, not in the batch)
+  s.at(1000, () => { s.mv.leave(0); s.done[0] = true; }); // W re-plans away
+  s.run(5000);
+  // F must be admitted right after W withdraws, not frozen until an unrelated event touches its FIFO.
+  expect(s.firstAdmit[1]).toBe(1000);
+  expect(s.mv.admissibleHeads()).toBe(0);
+});

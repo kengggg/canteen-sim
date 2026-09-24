@@ -3,12 +3,7 @@ import { presetConfig } from '../../src/config/presets';
 import { quantile } from '../../src/sim/metrics';
 import { run, SEEDS, pairedCI } from './helpers';
 
-/**
- * Mechanism test (spec §13.4, R18), on the paired MEAN (ruling): the median does not drop, because claims succeed
- * mostly early, at empty tables near the entrance, farther from the stalls than the tables the same groups find in B
- * off-peak; the search the claim avoids shows in the peak and in the tail.
- */
-test('mechanism (Reservation-friendly): claimed groups’ mean food-to-seat is lower in A than for the same people in B', () => {
+function claimedDiffs(): { mean: number[]; median: number[] } {
   const dMean: number[] = [];
   const dMedian: number[] = [];
   for (const seed of SEEDS) {
@@ -26,8 +21,26 @@ test('mechanism (Reservation-friendly): claimed groups’ mean food-to-seat is l
     b.sort((x, y) => x - y);
     dMedian.push(quantile(a, 50)! - quantile(b, 50)!);
   }
-  const ci = pairedCI(dMean);
-  console.log(`mechanism: mean A−B ${(ci.mean / 1000).toFixed(1)} s (95% CI ${(ci.lo / 1000).toFixed(1)} to ${(ci.hi / 1000).toFixed(1)}); median A−B ${(pairedCI(dMedian).mean / 1000).toFixed(1)} s`);
+  return { mean: dMean, median: dMedian };
+}
+let diffs: { mean: number[]; median: number[] } | null = null;
+const getDiffs = () => (diffs ??= claimedDiffs());
+
+/**
+ * Spec §13.4 mechanism test, as specified (median). It does NOT hold in this model — see the spec's implementation
+ * finding — so it is kept as a documented expected failure until the owner decides. If the model ever changes so that
+ * it passes, this test turns red and the finding must be revisited.
+ */
+test.fails('mechanism (Reservation-friendly, as specified): claimed groups’ median food-to-seat is lower in A than for the same people in B', () => {
+  const ci = pairedCI(getDiffs().median);
+  console.log(`mechanism median A−B ${(ci.mean / 1000).toFixed(1)} s (95% CI ${(ci.lo / 1000).toFixed(1)} to ${(ci.hi / 1000).toFixed(1)})`);
+  expect(ci.hi).toBeLessThan(0);
+});
+
+/** Supplementary mechanism check on the mean: the search a claim avoids. */
+test('mechanism (Reservation-friendly, supplementary): claimed groups’ mean food-to-seat is lower in A than for the same people in B', () => {
+  const ci = pairedCI(getDiffs().mean);
+  console.log(`mechanism mean A−B ${(ci.mean / 1000).toFixed(1)} s (95% CI ${(ci.lo / 1000).toFixed(1)} to ${(ci.hi / 1000).toFixed(1)})`);
   expect(ci.hi).toBeLessThan(0);
 });
 

@@ -135,6 +135,16 @@ export class Movement {
     return w;
   }
 
+  /** Liveness diagnostic: FIFO heads that could enter now (after a kind-6 step this must be 0). */
+  admissibleHeads(): number {
+    let n = 0;
+    for (let ed = 0; ed < this.fifo.length; ed++) {
+      const f = this.fifo[ed];
+      if (f.length > 0 && this.check(f[0], ed) === OK) n++;
+    }
+    return n;
+  }
+
   // ---------------------------------------------------------------- agent operations
 
   placeAt(p: number, node: number): void {
@@ -166,9 +176,22 @@ export class Movement {
     } else {
       this.removeFromFifo(p, ed);
     }
+    const wasWaiter = this.waiter[p] === 1;
     this.clearWaiter(p, ed);
     this.wantEd[p] = -1;
     this.fresh[p] = 0;
+    if (wasWaiter) {
+      // Fewer opposite waiters (or a stale batch) can unblock heads anywhere on this link.
+      this.markLinkDirty(this.edgeLink[ed >> 1]);
+      this.host.requestAdmit();
+    }
+  }
+
+  private markLinkDirty(L: number): void {
+    for (const e of this.G.links[L].edges) {
+      this.markDirty(2 * e);
+      this.markDirty(2 * e + 1);
+    }
   }
 
   /** p stops at its node to act or wait (spec §4.2 rule 3: leaves its link). */
@@ -229,15 +252,25 @@ export class Movement {
     this.dirtyList = [];
     for (const ed of dirty) this.dirtyFlag[ed] = 0;
 
-    // Batch formation for 1-lane links with no direction and waiters.
+    // Batch formation for 1-lane links with no direction and waiters. A (re)formed batch changes who may enter
+    // anywhere on the link, so every FIFO of a touched 1-lane link is examined.
+    const exam = new Set<number>(dirty);
+    const links = new Set<number>();
     for (const ed of dirty) {
       const L = this.edgeLink[ed >> 1];
-      if (this.linkOneLane[L]) this.maybeFormBatch(L);
+      if (this.linkOneLane[L]) links.add(L);
+    }
+    for (const L of links) {
+      this.maybeFormBatch(L);
+      for (const e of this.G.links[L].edges) {
+        exam.add(2 * e);
+        exam.add(2 * e + 1);
+      }
     }
 
     // Examine FIFO heads in ascending (waitStart, personId).
     const heap: number[] = [];
-    for (const ed of dirty) if (this.fifo[ed].length > 0) this.heapPush(heap, ed);
+    for (const ed of exam) if (this.fifo[ed].length > 0) this.heapPush(heap, ed);
     while (heap.length > 0) {
       const ed = this.heapPop(heap);
       const f = this.fifo[ed];
@@ -385,10 +418,7 @@ export class Movement {
     this.regLink[p] = -1;
     if (this.linkDir(L) === 0) {
       if (this.batchState[L] === 2) this.batchState[L] = 0;
-      for (const e of this.G.links[L].edges) {
-        this.markDirty(2 * e);
-        this.markDirty(2 * e + 1);
-      }
+      this.markLinkDirty(L);
       this.host.requestAdmit();
     }
   }

@@ -28,9 +28,11 @@ test.each(SEEDS)('default termination and Little’s law, seed %i, A at 100% and
 
 test('Crush, narrow vertical aisles and together mode terminate', () => {
   for (const seed of [1, 2, 3]) {
-    const crush = run(presetConfig('crush'), seed, 1);
-    expect(crush.done).toBe(true);
-    expect(crush.world.exited === crush.world.pop.personCount || crush.truncated).toBe(true);
+    for (const f of [1, 0]) {
+      const crush = run(presetConfig('crush'), seed, f);
+      expect(crush.truncated).toBe(false);
+      expect(crush.world.exited).toBe(crush.world.pop.personCount);
+    }
     const narrow = defaultConfig();
     narrow.layout.verticalAisle = 0.6;
     for (const f of [1, 0]) {
@@ -48,7 +50,8 @@ test('Crush, narrow vertical aisles and together mode terminate', () => {
 
 test('maximum layout (20 × 20, k = 4, 60 stalls) with 1,000 people terminates', () => {
   const c = defaultConfig();
-  c.layout = { cols: 20, rows: 20, seatsPerSide: 4, verticalAisle: 3, horizontalAisle: 3, stallCount: 60, queueDepth: 10 };
+  // 0.6 m aisles keep every 1-lane rule active at the largest scale.
+  c.layout = { cols: 20, rows: 20, seatsPerSide: 4, verticalAisle: 0.6, horizontalAisle: 0.6, stallCount: 60, queueDepth: 10 };
   c.crowd.totalPeople = 1000;
   for (const f of [1, 0]) {
     const s = run(c, 1, f);

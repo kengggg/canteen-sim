@@ -275,6 +275,10 @@ export class World {
     this.admitPending = false;
   }
 
+  admitIsPending(): boolean {
+    return this.admitPending;
+  }
+
   schedule(ms: number, kind: number, entity: number, type: number, arg: number, stamp = 0): void {
     this.q.push(ms, kind, entity, type, arg, stamp);
   }

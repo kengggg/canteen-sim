@@ -52,6 +52,19 @@ export function groupArrive(w: World, g: number): void {
     for (const p of members(G)) if (p !== G.claimer) goBuy(w, p);
   }
   w.setPhase(G.claimer, PH.CLAIMING);
+  if (w.claimLimitMs === 0) {
+    // Limit 0 (spec §5.4 point 8): only tables seen at the entrance at the entry ms; none empty → fall back at once,
+    // before the claimer takes a step.
+    const mem = G.mem!;
+    if (w.pc.G.nodes[entrance].intersection) mem.visit(entrance, w.now);
+    observe(mem, w.pc, entrance, w.now, truthOf(w));
+    const tgt = claimTarget(mem, w.pc, entrance, G.size, (a) => sumDist(w, G, a));
+    if (!tgt) {
+      fallback(w, G, 1);
+      w.trace?.('arrive', g, 0, 0);
+      return;
+    }
+  }
   w.schedule(w.now + w.claimLimitMs, K.TIMER, w.pidOf(G.first), EV.CUTOFF, g);
   claimObserve(w, G.claimer, entrance);
   w.trace?.('arrive', g, 0, 0);
