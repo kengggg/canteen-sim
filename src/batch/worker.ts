@@ -1,13 +1,19 @@
 import { runJob } from './runner';
+import { runScenario, scenarios, type SelfTestResult } from './selftest';
 import type { Job } from './sweep';
 
-export type ToWorker = { type: 'ping' } | { type: 'run'; job: Job };
-export type FromWorker = { type: 'pong' } | { type: 'result'; key: string; result: ReturnType<typeof runJob> } | { type: 'error'; key: string; message: string };
+export type ToWorker = { type: 'ping' } | { type: 'run'; job: Job } | { type: 'selftest'; id: string };
+export type FromWorker = { type: 'pong' } | { type: 'selftest'; id: string; result: SelfTestResult } | { type: 'result'; key: string; result: ReturnType<typeof runJob> } | { type: 'error'; key: string; message: string };
 
 /** The worker's message handler, separate from the bootstrap so it can be tested without a Worker. */
 export function handle(msg: ToWorker, post: (m: FromWorker) => void): void {
   if (msg.type === 'ping') {
     post({ type: 'pong' });
+    return;
+  }
+  if (msg.type === 'selftest') {
+    const sc = scenarios().find((x) => x.id === msg.id)!;
+    post({ type: 'selftest', id: msg.id, result: runScenario(sc) });
     return;
   }
   try {

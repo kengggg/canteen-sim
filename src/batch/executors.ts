@@ -163,6 +163,8 @@ export class PoolExecutor implements Executor {
           if (m.type === 'result') {
             if (!ctl.cancelled) onResult(m.result);
             next();
+          } else if (m.type === 'selftest') {
+            // Not used by batches.
           } else if (m.type === 'error') {
             failure = m.message;
             current = null;

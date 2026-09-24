@@ -1,5 +1,7 @@
 import { computed, signal } from '@preact/signals';
+import { applyValues } from '../config/load';
 import { cloneConfig } from '../config/meta';
+import { parseShared } from '../config/url';
 import { defaultConfig, type Config } from '../config/schema';
 import { validate } from '../config/validate';
 import type { Pick } from '../render/scene';
@@ -9,7 +11,24 @@ import { Controller } from './controller';
 export type Drawer = 'settings' | 'assumptions' | 'batch' | null;
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
-export const controller = new Controller(defaultConfig());
+function initialConfig(): { cfg: Config; notices: string[] } {
+  try {
+    if (typeof location !== 'undefined' && location.hash.startsWith('#v=')) {
+      const d = parseShared(location.hash);
+      if (d.ok) {
+        const r = applyValues(d.values, d.model);
+        return { cfg: r.cfg, notices: [...r.notices, ...(r.modelNotice ? [`Shared with model ${r.modelNotice.from}; results may differ in model ${r.modelNotice.to}.`] : [])] };
+      }
+      return { cfg: defaultConfig(), notices: ['This settings code isn’t valid or is from a newer version'] };
+    }
+  } catch {
+    // Fall through to the defaults.
+  }
+  return { cfg: defaultConfig(), notices: [] };
+}
+const initial = initialConfig();
+
+export const controller = new Controller(initial.cfg);
 
 export const pending = signal<Config>(cloneConfig(controller.applied));
 export const applied = signal<Config>(cloneConfig(controller.applied));
@@ -30,7 +49,7 @@ export const colorByGroup = signal(false);
 export const seatTints = signal(false);
 export const hover = signal<(Pick & { x: number; y: number }) | null>(null);
 export const webgl = signal<'ok' | 'none' | 'lost'>('ok');
-export const notices = signal<string[]>([]);
+export const notices = signal<string[]>(initial.notices);
 export const skipProgress = signal<number | null>(null);
 export const endCardOpen = signal(false);
 export const evidenceOpen = signal(false);

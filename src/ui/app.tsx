@@ -12,6 +12,8 @@ import { EndCard } from './endcard';
 import { HowTo } from './howto';
 import { HoverCard } from './hovercard';
 
+const HOST_THEME = document.documentElement.getAttribute('data-theme');
+
 function Banners() {
   void tick.value;
   const err = controller.error;
@@ -52,9 +54,12 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   useEffect(() => {
+    // "System" restores whatever the host page set (the artifact viewer stamps data-theme for an explicit choice).
     const root = document.documentElement;
-    if (theme.value === 'system') root.removeAttribute('data-theme');
-    else root.setAttribute('data-theme', theme.value);
+    if (theme.value === 'system') {
+      if (HOST_THEME) root.setAttribute('data-theme', HOST_THEME);
+      else root.removeAttribute('data-theme');
+    } else root.setAttribute('data-theme', theme.value);
   }, [theme.value]);
   void applied.value;
   return (
