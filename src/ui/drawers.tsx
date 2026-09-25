@@ -1,12 +1,13 @@
 import { AssumptionsPanel } from './assumptions';
+import { FindingsPanel } from './findings';
 import { BatchPanel } from './batchview';
 import { SettingsPanel } from './settings';
 import { batch } from './batchrun';
 import { drawer } from './store';
 
-const TITLES = { settings: 'Settings', assumptions: 'Assumptions', batch: 'Batch runs' } as const;
+const TITLES = { settings: 'Settings', assumptions: 'Assumptions', batch: 'Batch runs', findings: 'Findings' } as const;
 
-/** Side drawers for settings, assumptions and batch runs. The settings drawer is read-only during a batch. */
+/** Side drawers for settings, assumptions, batch runs and findings. The settings drawer is read-only during a batch. */
 export function Drawers() {
   const d = drawer.value;
   if (!d) return null;
@@ -23,6 +24,7 @@ export function Drawers() {
           {d === 'settings' && <SettingsPanel />}
           {d === 'assumptions' && <AssumptionsPanel />}
           {d === 'batch' && <BatchPanel />}
+          {d === 'findings' && <FindingsPanel />}
         </fieldset>
       </div>
     </aside>

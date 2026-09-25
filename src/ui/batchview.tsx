@@ -16,7 +16,7 @@ import { EVIDENCE, evidenceBatch } from './evidence';
 import { num } from './format';
 import { CHART_CAPTION, MSG } from './labels';
 import { LoadReadout } from './settings';
-import { applied, copyText, evidenceOpen, themeGen } from './store';
+import { applied, copyText, drawer, evidenceOpen, themeGen } from './store';
 
 const pctLabel = (f: number) => `${Math.round(f * 100)}%`;
 
@@ -190,7 +190,12 @@ function Results({ r, precomputed, cfg }: { r: BatchResult; precomputed: boolean
   const shown = CATALOG.filter((m) => m.better !== null);
   return (
     <div class="results">
-      {precomputed && <p class="precomputed">{MSG.precomputed(EVIDENCE.model)}</p>}
+      {precomputed && (
+        <p class="precomputed">
+          {MSG.precomputed(EVIDENCE.model)}{' '}
+          <button type="button" class="linklike" onClick={() => (drawer.value = 'findings')}>Read the findings</button>
+        </p>
+      )}
       {truncated > 0 && <p class="warn-text">{truncated} of {r.runs.length} runs truncated; their seeds are dropped from the statistics.</p>}
       <h3 class="section-title">{r.kind === 'reservation' ? 'Primary endpoints at 100% vs 0% reservation' : `Primary endpoints by ${META_BY_ID.get(r.setting!)?.label}`}</h3>
       <PrimaryCards r={r} at={head} />

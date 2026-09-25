@@ -12,6 +12,9 @@ up), peak seat utilization and peak throughput.
 - **Live page (private claude.ai artifact):** https://claude.ai/artifact/7NBZqCJ7HxeGJ2LCNSnfNv
 - **Design spec:** [`docs/superpowers/specs/2026-09-24-canteen-sim-design.md`](docs/superpowers/specs/2026-09-24-canteen-sim-design.md)
 - **Assumptions and fairness ledger:** spec §15, also shown in the app's **Assumptions** panel.
+- **Findings:** the app's **Findings** panel (or the page URL with `#findings`) explains what the default evidence
+  shows, in plain words with charts; its extra figures live in `src/generated/findings.json` (spec §10.9, §11.13).
+  After `npm run precompute`, run `npm run findings` too: a test fails until the two files agree.
 - **Implementation plans:** [`docs/superpowers/plans/`](docs/superpowers/plans/)
 
 ## Run, test, build

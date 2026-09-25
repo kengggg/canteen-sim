@@ -51,6 +51,13 @@
   --seat-4: #e69f00;
   --seat-5: #009e73;
 
+  /* Findings charts: reservation level, free flow (blue) to 100% reserving (orange-red). */
+  --lvl-0: #1f5da8;
+  --lvl-1: #5a8fd0;
+  --lvl-2: #b98ad8;
+  --lvl-3: #e08a2e;
+  --lvl-4: #b8430f;
+
   --radius: 6px;
   --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -110,6 +117,11 @@
     --seat-3: #ff7a1f;
     --seat-4: #ffb52e;
     --seat-5: #2fc79a;
+    --lvl-0: #86b6ff;
+    --lvl-1: #4f86d6;
+    --lvl-2: #b48ee0;
+    --lvl-3: #f0a060;
+    --lvl-4: #ff7a45;
   }
 }
 
@@ -161,6 +173,11 @@
   --seat-3: #ff7a1f;
   --seat-4: #ffb52e;
   --seat-5: #2fc79a;
+  --lvl-0: #86b6ff;
+  --lvl-1: #4f86d6;
+  --lvl-2: #b48ee0;
+  --lvl-3: #f0a060;
+  --lvl-4: #ff7a45;
 }
 
 /* ---------------------------------------------------------------- base */

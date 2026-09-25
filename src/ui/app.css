@@ -516,6 +516,146 @@ table.data caption {
   padding: 6px 0;
 }
 
+
+/* ---------------------------------------------------------------- findings panel (spec §11.13) */
+.drawer.drawer-findings {
+  width: min(880px, 100vw);
+}
+.findings {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  line-height: 1.5;
+}
+.findings p,
+.findings li {
+  max-width: 72ch;
+}
+.flead {
+  font-size: var(--fs-3);
+  font-weight: 600;
+  text-wrap: balance;
+  margin: 0;
+}
+.fscope {
+  margin: -8px 0 0;
+  font-size: var(--fs-1);
+}
+.fsection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.fsection h3 {
+  font-size: var(--fs-3);
+  text-wrap: balance;
+  margin: 0;
+}
+.fsection p {
+  margin: 0;
+}
+.fbullets {
+  margin: 0;
+  padding-left: 1.1em;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.findings .table-scroll {
+  max-height: none;
+}
+.findings table.data td {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.findings table.data th[scope='row'] {
+  font-weight: 500;
+}
+.findings table.data tr.total th,
+.findings table.data tr.total td {
+  font-weight: 700;
+}
+.fdetails summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.fdetails[open] summary {
+  margin-bottom: 8px;
+}
+.fchart {
+  margin: 4px 0;
+  padding: 10px 12px;
+  background: var(--panel-2);
+  border-radius: var(--radius);
+}
+.fchart figcaption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: var(--fs-2);
+  margin-bottom: 6px;
+}
+.fchart figcaption .linklike {
+  margin-left: auto;
+  font-size: var(--fs-1);
+}
+.fchart-note {
+  font-size: var(--fs-0);
+  margin: 6px 0 0;
+}
+.fsvg {
+  width: 100%;
+  overflow: hidden;
+}
+.fsvg svg {
+  display: block;
+}
+.fsvg text {
+  font-family: var(--font);
+  font-size: 11px;
+  fill: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.fsvg .ftitle {
+  fill: var(--ink);
+  font-weight: 600;
+}
+.fsvg .fgrid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.fsvg .frule line {
+  stroke: var(--muted);
+  stroke-dasharray: 4 3;
+}
+.flegend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: var(--fs-0);
+  color: var(--ink);
+}
+.flegend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.flegend .sw {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+  background: var(--sw);
+  flex: none;
+}
+.flegend .sw-hatch {
+  background: repeating-linear-gradient(45deg, var(--sw) 0 3px, var(--panel) 3px 5px);
+}
+
 /* ---------------------------------------------------------------- drawers and overlays */
 .drawer {
   position: fixed;

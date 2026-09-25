@@ -92,6 +92,7 @@ export function TopBar() {
           <Skip />
         </div>
         <nav class="tools" aria-label="Panels">
+          <button type="button" onClick={() => (drawer.value = drawer.value === 'findings' ? null : 'findings')} aria-pressed={drawer.value === 'findings'}>Findings</button>
           <button type="button" onClick={() => (drawer.value = drawer.value === 'assumptions' ? null : 'assumptions')} aria-pressed={drawer.value === 'assumptions'}>Assumptions</button>
           <button type="button" aria-label={ARIA.settings} title={ARIA.settings} onClick={() => (drawer.value = drawer.value === 'settings' ? null : 'settings')} aria-pressed={drawer.value === 'settings'}>⚙</button>
           <button type="button" aria-label={ARIA.batch} title={ARIA.batch} onClick={() => (drawer.value = drawer.value === 'batch' ? null : 'batch')} aria-pressed={drawer.value === 'batch'}>📊</button>

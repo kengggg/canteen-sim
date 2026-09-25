@@ -67,6 +67,13 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
   useEffect(() => {
+    // A bare #findings link opens the Findings panel (settings codes use #v=…).
+    const open = () => { if (location.hash === '#findings') drawer.value = 'findings'; };
+    open();
+    window.addEventListener('hashchange', open);
+    return () => window.removeEventListener('hashchange', open);
+  }, []);
+  useEffect(() => {
     // Drawers open below the top bar so its buttons stay reachable; the bar's height changes as it wraps.
     const bar = document.querySelector<HTMLElement>('.topbar');
     if (!bar) return;

@@ -8,7 +8,7 @@ import type { Pick } from '../render/scene';
 import { Controller } from './controller';
 
 /** UI state (signals). Engine state lives in the controller; `tick` is bumped when panels should re-read it. */
-export type Drawer = 'settings' | 'assumptions' | 'batch' | null;
+export type Drawer = 'settings' | 'assumptions' | 'batch' | 'findings' | null;
 export type ThemeChoice = 'system' | 'light' | 'dark';
 
 function initialConfig(): { cfg: Config; notices: string[] } {
