@@ -617,12 +617,19 @@ function tidy<T>(x: T, path = ''): T {
 export function computeFindings(opts: { n?: number; onProgress?: (msg: string) => void; evidence?: Pick<Evidence, 'runs'> } = {}): Findings {
   const n = opts.n ?? 30;
   const log = opts.onProgress ?? (() => {});
+  const stale = 'if the engine changed, run npm run precompute first; otherwise the instrumentation altered a run';
+  if (opts.evidence) {
+    // Fail in seconds, not after the sweep, when the evidence is stale.
+    const first = sweepJobs(defaultConfig(), 1, [0])[0];
+    const want = opts.evidence.runs.find((r) => r.k === first.key)?.h;
+    if (runJob(first).hash !== want) throw new Error(`run ${first.key} differs from evidence.json: run npm run precompute first`);
+  }
   log(`default sweep: ${RESERVATION_LEVELS.length} levels × ${n} lunches`);
   const sweep = sweepFigures(defaultConfig(), n, RESERVATION_LEVELS, (m) => log(`default sweep: ${m}`));
   if (opts.evidence) {
     const expected = new Map(opts.evidence.runs.map((r) => [r.k, r.h]));
     const bad = sweep.results.filter((r) => expected.get(r.key) !== r.hash).map((r) => r.key);
-    if (bad.length > 0) throw new Error(`instrumented runs differ from the evidence: ${bad.join(', ')}`);
+    if (bad.length > 0) throw new Error(`${bad.length} of ${sweep.results.length} runs differ from evidence.json (first: ${bad[0]}): ${stale}`);
   }
   const robustness: RobustRow[] = [];
   for (const v of VARIANTS) {

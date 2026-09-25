@@ -566,9 +566,25 @@ table.data caption {
 .findings .table-scroll {
   max-height: none;
 }
-.findings table.data td {
+.findings table.data td.num {
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+}
+.findings table.fdefs td {
+  text-align: left;
+  white-space: normal;
+}
+.findings .table-scroll th[scope='row'] {
+  position: sticky;
+  left: 0;
+  background: var(--panel);
+}
+.fchart .table-scroll th[scope='row'] {
+  background: var(--panel-2);
+}
+.findings code {
+  font-family: var(--mono);
+  font-size: 0.92em;
 }
 .findings table.data th[scope='row'] {
   font-weight: 500;
@@ -600,6 +616,8 @@ table.data caption {
 .fchart figcaption .linklike {
   margin-left: auto;
   font-size: var(--fs-1);
+  white-space: nowrap;
+  flex: none;
 }
 .fchart-note {
   font-size: var(--fs-0);
@@ -630,6 +648,19 @@ table.data caption {
   stroke: var(--muted);
   stroke-dasharray: 4 3;
 }
+.fsvg .fseg {
+  stroke: var(--panel-2);
+  stroke-width: 1;
+}
+.fsvg .fseg-outline {
+  stroke: var(--muted);
+}
+.fsvg .fdirect line {
+  stroke: var(--muted);
+}
+.fsvg .fdirect text {
+  fill: var(--ink);
+}
 .flegend {
   display: flex;
   flex-wrap: wrap;
@@ -653,7 +684,13 @@ table.data caption {
   flex: none;
 }
 .flegend .sw-hatch {
-  background: repeating-linear-gradient(45deg, var(--sw) 0 3px, var(--panel) 3px 5px);
+  background: repeating-linear-gradient(135deg, var(--panel) 0 2px, var(--sw) 2px 6px);
+}
+.flegend .sw-outline {
+  box-shadow: inset 0 0 0 1px var(--muted);
+}
+.flegend .sw-line {
+  flex: none;
 }
 
 /* ---------------------------------------------------------------- drawers and overlays */
@@ -682,6 +719,10 @@ table.data caption {
 }
 .drawer-head h2 {
   font-size: var(--fs-3);
+}
+/* Headings take focus when a link opens a drawer (spec §11.11); they are not controls, so no focus ring. */
+.drawer-head h2:focus {
+  outline: none;
 }
 .drawer-body {
   overflow-y: auto;

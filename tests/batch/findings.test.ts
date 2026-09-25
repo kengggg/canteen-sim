@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { collectRun, EMPTY_TABLE_MINUTES, SEAT_CATS, sweepFigures } from '../../src/batch/findings';
+import { collectRun, EMPTY_TABLE_MINUTES, SEAT_CATS, settingChanges, sweepFigures, VARIANTS } from '../../src/batch/findings';
 import { evidenceDigest, LEVEL_KEYS, RESERVE_LEVEL_KEYS, type Findings, type FindingStat } from '../../src/batch/findings-data';
 import { decodeEvidence, type Evidence } from '../../src/batch/precompute';
 import { runJob } from '../../src/batch/runner';
@@ -20,9 +20,10 @@ const mean = (xs: number[]) => sum(xs) / xs.length;
 const near = (x: number, y: number, tol: number) => expect(Math.abs(x - y)).toBeLessThanOrEqual(tol * Math.max(1, Math.abs(y)));
 
 test('the shipped findings are current: model version and evidence digest', () => {
-  expect(findings.model).toBe(MODEL_VERSION);
-  expect(findings.evidenceDigest).toBe(evidenceDigest(evidence));
-  expect(findings.n).toBe(evidence.n);
+  const stale = 'src/generated/findings.json is stale: run npm run findings';
+  expect(findings.model, stale).toBe(MODEL_VERSION);
+  expect(findings.evidenceDigest, `${stale} (it was computed against other evidence)`).toBe(evidenceDigest(evidence));
+  expect(findings.n, stale).toBe(evidence.n);
   expect(Object.keys(findings.emptyTables.byLevel).sort()).toEqual([...LEVEL_KEYS].sort());
   for (const k of LEVEL_KEYS) expect(findings.emptyTables.byLevel[k]).toHaveLength(EMPTY_TABLE_MINUTES + 1);
 });
@@ -60,13 +61,25 @@ describe('the shipped findings agree with the shipped evidence', () => {
     }
   });
 
-  test('time totals: entrance-to-seat advantage and baseline queue wait', () => {
+  test('time: totals, the queue part and the baseline trip match the evidence', () => {
     for (const k of RESERVE_LEVEL_KEYS) {
       const t = findings.time.byLevel[k];
       near(t.totalS, stat('entranceToSeatMeanMin', Number(k)).adv.mean! * 60, 5e-4);
       near(t.toQueueS + t.queueAndServiceS + t.afterServiceS, t.totalS, 1e-4);
+      // Service time is fixed per person, so the queue-and-service change is the queue-wait change.
+      near(t.queueAndServiceS, stat('queueWaitMeanMin', Number(k)).adv.mean! * 60, 1e-4);
     }
-    near(findings.time.baseline.queueWaitS, mean(metricsAt(0).map((x) => x.queueWaitMeanMin!)) * 60, 1e-4);
+    const b = findings.time.baseline;
+    near(b.queueWaitS, mean(metricsAt(0).map((x) => x.queueWaitMeanMin!)) * 60, 1e-4);
+    near(b.toQueueS + b.queueAndServiceS + b.afterServiceS, mean(metricsAt(0).map((x) => x.entranceToSeatMeanMin!)) * 60, 1e-4);
+  });
+
+  test('fallback walk-away % is the pooled walk-away % of the evidence cohort of reservers who found no table', () => {
+    for (const k of RESERVE_LEVEL_KEYS) {
+      const cs = pairsAt(Number(k)).map((p) => p.cohorts.Rfallback.level);
+      const pooled = sum(cs.map((c) => c.people * (c.walkAwayPct ?? 0))) / sum(cs.map((c) => c.people));
+      near(findings.claims.byLevel[k].fallbackWalkAwayPct, pooled, 1e-5);
+    }
   });
 
   test('the default robustness row is the evidence at 100% vs 0%', () => {
@@ -82,6 +95,15 @@ describe('the shipped findings agree with the shipped evidence', () => {
     check(row.e2sMin, 'entranceToSeatMeanMin', 1);
     check(row.peakUtilPct, 'peakUtilization', 100);
     check(row.peakThroughput, 'peakThroughputPerHour', 1);
+  });
+});
+
+test('the robustness rows are the VARIANTS settings, in order, with their labels and setting changes', () => {
+  expect(findings.robustness.map((r) => r.id)).toEqual(VARIANTS.map((v) => v.id));
+  VARIANTS.forEach((v, i) => {
+    const stale = `findings.json robustness row ${v.id} no longer matches VARIANTS or the presets: run npm run findings`;
+    expect(findings.robustness[i].label, stale).toBe(v.label);
+    expect(findings.robustness[i].changes, stale).toEqual(settingChanges(v.make()));
   });
 });
 

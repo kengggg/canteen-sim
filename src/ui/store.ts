@@ -40,6 +40,11 @@ export const frameTick = signal(0);
 export const playing = signal(false);
 export const speed = signal(60);
 export const drawer = signal<Drawer>(null);
+/** Open a drawer and move focus to its heading, for links that jump between panels (spec §11.11). */
+export function openDrawer(d: Exclude<Drawer, null>): void {
+  drawer.value = d;
+  requestAnimationFrame(() => document.querySelector<HTMLElement>('.drawer-head h2')?.focus());
+}
 export const focusSetting = signal<string | null>(null);
 export const howto = signal(false);
 export const theme = signal<ThemeChoice>('system');

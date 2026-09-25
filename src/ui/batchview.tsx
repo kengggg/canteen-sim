@@ -16,7 +16,7 @@ import { EVIDENCE, evidenceBatch } from './evidence';
 import { num } from './format';
 import { CHART_CAPTION, MSG } from './labels';
 import { LoadReadout } from './settings';
-import { applied, copyText, drawer, evidenceOpen, themeGen } from './store';
+import { applied, copyText, evidenceOpen, openDrawer, themeGen } from './store';
 
 const pctLabel = (f: number) => `${Math.round(f * 100)}%`;
 
@@ -193,7 +193,7 @@ function Results({ r, precomputed, cfg }: { r: BatchResult; precomputed: boolean
       {precomputed && (
         <p class="precomputed">
           {MSG.precomputed(EVIDENCE.model)}{' '}
-          <button type="button" class="linklike" onClick={() => (drawer.value = 'findings')}>Read the findings</button>
+          <button type="button" class="linklike" onClick={() => openDrawer('findings')}>Read the findings</button>
         </p>
       )}
       {truncated > 0 && <p class="warn-text">{truncated} of {r.runs.length} runs truncated; their seeds are dropped from the statistics.</p>}

@@ -4,6 +4,7 @@ import type { BatchResult, MetricStat, RunResult } from '../batch/runner';
 import { pairedStat, type PairedStat } from '../batch/stats';
 import type { Config } from '../config/schema';
 import type { CohortStats } from '../sim/pairmetrics';
+import { runBelow } from './findings-text';
 
 /**
  * Everything the Findings panel (spec §11.13) prints, as numbers: evidence-backed figures computed from the decoded
@@ -58,8 +59,14 @@ export interface FindingsModel {
   claimMedianS100: number;
   /** Mean completely empty tables every 5 minutes from 11:00 (index i = minute 5i). */
   empty: { minutes: number[]; byLevel: Record<LevelKey, number[]> };
+  /** Mean busiest-hour window, minutes after 11:00 (start, end). */
+  peakWindow: [number, number];
+  /** The rush peak and the canteen size, from the default settings. */
+  rushPeakMin: number;
+  tables: number;
+  seatsPerTable: number;
   emptyAt1210: Record<LevelKey, number>;
-  /** Minutes (after 11:00) where 100% reserving has fewer than 1.5 empty tables on average. */
+  /** The unbroken stretch of minutes around the low point where 100% reserving has fewer than 1.5 empty tables on average. */
   scarce100: [number, number] | null;
   fallbackNoTarget100: number;
   claimsPerLunch: Record<ReserveLevelKey, number>;
@@ -74,10 +81,15 @@ export interface FindingsModel {
   meanSize: { claimed: number; fallback: number };
   /** Share of reserving groups that got a table, by 10-minute arrival bin (bin i starts at minute 10i). */
   claimByArrival: Record<ReserveLevelKey, number[]>;
+  /** Middle minute of each arrival bin. */
+  claimBinMid: number[];
+  /** At 50%: the start of the first bin in which not every reserver got a table (null if bin 0 already misses). */
   claimAllBeforeMin50: number | null;
   claimShare1210to1250at50: [number, number];
   fallbackMedianArrival: [number, number];
   fallbackVsSameTime: { f: number; actual: number; atNonReserverRates: number }[];
+  /** Largest gap (pp) between reservers who found no table and non-reservers arriving at the same times. */
+  fallbackSameTimeMaxGap: number;
   /** Walk-away % of people by group size (3–6) per level. */
   bySize: { size: number; pct: Record<LevelKey, number> }[];
   bigGroupsWalkShare0: number;
@@ -85,6 +97,9 @@ export interface FindingsModel {
   bigGroupsPeopleShare: number;
   midGroupsWalkShare: { b: number; a100: number };
   pairWalkAways: { groups: number; level: number | null };
+  soloWalkAways: number;
+  /** Walk-aways at 100% as a multiple of free flow's. */
+  walkRatio: number;
   anatomy: { totalGroups: number; tooFew: number; oneTable0: number; oneTableReserve: [number, number]; emptyAmongFit0: number; nearestFitM0: number | null; freeSeats0: number; freeSeatsReserve: [number, number] };
   time: Findings['time'];
   fallbacks75: number;
@@ -174,9 +189,9 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     emptyBy[levelKey(f)] = minutes.map((m) => series[m]);
     emptyAt1210[levelKey(f)] = series[70];
   }
-  const s100 = fd.emptyTables.byLevel['1'];
-  const scarceIdx = s100.map((v, i) => (v < 1.5 ? i : -1)).filter((i) => i >= 0);
-  const scarce100: [number, number] | null = scarceIdx.length ? [scarceIdx[0], scarceIdx[scarceIdx.length - 1]] : null;
+  const scarce100 = runBelow(fd.emptyTables.byLevel['1'], 1.5);
+  const windows = b.pairs.map((p) => p.pm.peakWindowStartMin);
+  const winLen = b.pairs[0]?.pm.peakWindowLengthMin ?? 60;
 
   const claimsPerLunch = {} as Record<ReserveLevelKey, number>;
   const reservingPerLunch = {} as Record<ReserveLevelKey, number>;
@@ -195,9 +210,10 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     rushFallbacks[k] = fd.claims.byLevel[k].rush.fallbacksRush;
     claimByArrival[k] = fd.claims.byLevel[k].bins.map((x) => (x.reserving > 0 ? x.claimed / x.reserving : NaN));
   }
-  const bins50 = claimByArrival['0.5'];
-  const firstShort = bins50.findIndex((v) => v < 0.995);
-  const mid = bins50.slice(7, 11);
+  const binMin = fd.claims.binMin;
+  const raw50 = fd.claims.byLevel['0.5'].bins;
+  const firstShort = raw50.findIndex((x) => x.claimed < x.reserving);
+  const mid = claimByArrival['0.5'].filter((_, i) => i * binMin >= 70 && (i + 1) * binMin <= 110);
 
   const cohortCell = (c: 'Rclaimed' | 'Rfallback' | 'N' | 'R', f: number): CohortCell | undefined => {
     const s = b.cohortStats.find((x) => x.cohort === c && x.metric === 'walkAwayPct' && x.fraction === f);
@@ -226,6 +242,10 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
   const mix = cfg.crowd.groupMix, mixSum = sum(mix);
   const pairWalk = LEVELS.map((f) => sum(runsAt(b, f).map((r) => Math.round((r.metrics.bySize[1].people * (r.metrics.bySize[1].walkAwayPct ?? 0)) / 200))));
   const pairWalkTotal = sum(pairWalk);
+  const soloWalk = sum(LEVELS.map((f) => sum(runsAt(b, f).map((r) => Math.round((r.metrics.bySize[0].people * (r.metrics.bySize[0].walkAwayPct ?? 0)) / 100)))));
+  const sameTime = RESERVE_LEVELS.filter((f) => fd.claims.byLevel[rkey(f)].fallbackWalkAwayPctAtNonReserverRates !== null).map((f) => ({
+    f, actual: fd.claims.byLevel[rkey(f)].fallbackWalkAwayPct, atNonReserverRates: fd.claims.byLevel[rkey(f)].fallbackWalkAwayPctAtNonReserverRates!,
+  }));
 
   const wa = fd.walkAways;
   const reserveOneTable = RESERVE_LEVELS.map((f) => wa[levelKey(f)].oneTableFit / wa[levelKey(f)].groups);
@@ -253,6 +273,10 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     blockedWhileNeeded: { b: stat(b, 'blockedWhileNeeded', 1).meanB!, a100: stat(b, 'blockedWhileNeeded', 1).meanA! },
     claimMedianS100: fd.claims.byLevel['1'].claimSearchMedianS.claimed,
     empty: { minutes, byLevel: emptyBy },
+    peakWindow: [Math.round(mean(windows)), Math.round(mean(windows)) + winLen],
+    rushPeakMin: cfg.crowd.peakTime - cfg.crowd.windowStart,
+    tables: cfg.layout.cols * cfg.layout.rows,
+    seatsPerTable: 2 * cfg.layout.seatsPerSide,
     emptyAt1210,
     scarce100,
     fallbackNoTarget100: fd.claims.byLevel['1'].fallbackNoTargetShare,
@@ -261,18 +285,20 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     claimedDelayS: minMax(claimedDelay),
     meanSize: { claimed: sizeOf('Rclaimed'), fallback: sizeOf('Rfallback') },
     claimByArrival,
-    claimAllBeforeMin50: firstShort > 0 ? firstShort * fd.claims.binMin : null,
+    claimBinMid: claimByArrival['0.5'].map((_, i) => i * binMin + binMin / 2),
+    claimAllBeforeMin50: firstShort > 0 ? firstShort * binMin : null,
     claimShare1210to1250at50: minMax(mid),
     fallbackMedianArrival: minMax(RESERVE_LEVELS.map((f) => fd.claims.byLevel[rkey(f)].medianArrivalMin.fallback)),
-    fallbackVsSameTime: RESERVE_LEVELS.filter((f) => fd.claims.byLevel[rkey(f)].fallbackWalkAwayPctAtNonReserverRates !== null).map((f) => ({
-      f, actual: fd.claims.byLevel[rkey(f)].fallbackWalkAwayPct, atNonReserverRates: fd.claims.byLevel[rkey(f)].fallbackWalkAwayPctAtNonReserverRates!,
-    })),
+    fallbackVsSameTime: sameTime,
+    fallbackSameTimeMaxGap: Math.max(0, ...sameTime.map((x) => Math.abs(x.actual - x.atNonReserverRates))),
     bySize,
     bigGroupsWalkShare0: (w0[4] + w0[5]) / sum(w0),
     bigGroupsGroupShare: (mix[4] + mix[5]) / mixSum,
     bigGroupsPeopleShare: (peopleBySize[4] + peopleBySize[5]) / sum(peopleBySize),
     midGroupsWalkShare: { b: (w0[2] + w0[3]) / sum(w0), a100: (w1[2] + w1[3]) / sum(w1) },
     pairWalkAways: { groups: pairWalkTotal, level: pairWalkTotal === 1 ? LEVELS[pairWalk.findIndex((x) => x === 1)] : null },
+    soloWalkAways: soloWalk,
+    walkRatio: h(1).walkPct / h(0).walkPct,
     anatomy: {
       totalGroups: sum(LEVELS.map((f) => wa[levelKey(f)].groups)),
       tooFew: sum(LEVELS.map((f) => wa[levelKey(f)].tooFew)),

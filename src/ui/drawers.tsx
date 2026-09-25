@@ -13,9 +13,10 @@ export function Drawers() {
   if (!d) return null;
   const readOnly = d === 'settings' && batch.value.status === 'running';
   return (
-    <aside class={`drawer drawer-${d}`} aria-label={TITLES[d]}>
+    // Keyed by drawer: each opens at the top rather than at the previous drawer's scroll position.
+    <aside key={d} class={`drawer drawer-${d}`} aria-label={TITLES[d]}>
       <header class="drawer-head">
-        <h2>{TITLES[d]}</h2>
+        <h2 tabIndex={-1}>{TITLES[d]}</h2>
         <button type="button" aria-label="Close" onClick={() => (drawer.value = null)}>×</button>
       </header>
       <div class="drawer-body">

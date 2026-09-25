@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { MODEL_VERSION } from '../sim/version';
 import { MSG } from './labels';
 import { Stage } from './stage';
-import { applied, controller, dirty, drawer, howto, notices, restart, theme, themeGen, tick } from './store';
+import { applied, controller, dirty, drawer, howto, notices, openDrawer, restart, theme, themeGen, tick } from './store';
 import { TopBar, togglePlay } from './topbar';
 import { copyText } from './store';
 import { LiveStats } from './livestats';
@@ -68,11 +68,16 @@ export function App() {
   }, []);
   useEffect(() => {
     // A bare #findings link opens the Findings panel (settings codes use #v=…).
-    const open = () => { if (location.hash === '#findings') drawer.value = 'findings'; };
+    const open = () => { if (location.hash === '#findings') openDrawer('findings'); };
     open();
     window.addEventListener('hashchange', open);
     return () => window.removeEventListener('hashchange', open);
   }, []);
+  useEffect(() => {
+    // Closing Findings drops a #findings hash, so the same link can open it again.
+    if (drawer.value === 'findings' || location.hash !== '#findings') return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch { /* sandboxed */ }
+  }, [drawer.value]);
   useEffect(() => {
     // Drawers open below the top bar so its buttons stay reachable; the bar's height changes as it wraps.
     const bar = document.querySelector<HTMLElement>('.topbar');

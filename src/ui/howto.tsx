@@ -8,7 +8,8 @@ const KEY = 'canteen-sim:howto-dismissed';
 export function HowTo() {
   const start = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (storage.get(KEY) !== '1') howto.value = true;
+    // A #findings link goes straight to the Findings panel, without the first-visit dialog on top.
+    if (storage.get(KEY) !== '1' && location.hash !== '#findings') howto.value = true;
   }, []);
   useEffect(() => {
     if (howto.value) start.current?.focus();

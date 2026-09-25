@@ -27,7 +27,7 @@ export interface FindingStat {
   L: number;
 }
 
-/** Reserving groups at one level (all counts are per lunch unless named `…Total`). */
+/** Reserving groups at one level: `bins` are totals over all lunches; `rush` counts are per lunch. */
 export interface ClaimLevel {
   /** Reserving groups by the arrival minute of their first member: bin i covers [i·binMin, (i+1)·binMin), totals over all lunches. */
   bins: { reserving: number; claimed: number }[];
@@ -71,11 +71,14 @@ export interface WalkAwayAnatomy {
   meanFreeSeats: number;
   /** oneTableFit groups for which a completely empty table was among the fitting tables. */
   emptyTableAmongFit: number;
-  /** Median walking distance (m) from the searcher to the nearest fitting table, over oneTableFit groups; null if not computed. */
+  /** Median walking distance (m) from the searcher's next node to the nearest fitting table, over oneTableFit groups; null if not computed. */
   nearestFitMedianM: number | null;
 }
 
-/** Mean per-person change against the same person at 0% in the same lunch (seconds), split along the trip. */
+/**
+ * Change against the same person at 0% in the same lunch (seconds), split along the trip. The parts and totals are the
+ * mean over lunches of each lunch's per-person mean; the fallbackClaimer* figures are pooled over all people in all lunches.
+ */
 export interface TimeSplit {
   /** Entrance to joining a queue. */
   toQueueS: number;
@@ -104,9 +107,9 @@ export interface RobustRow {
   /** Peak utilization in % (P3 × 100). */
   peakUtilPct: FindingStat;
   peakThroughput: FindingStat;
-  /** Mean change (min) in entrance-to-seat for people seated in both runs, 100% minus 0%. */
+  /** Mean change (min) in entrance-to-seat for people seated in both runs, 100% minus 0%, pooled over all lunches. */
   seatedE2sDeltaMin: number;
-  /** Mean change (min) in entrance-to-give-up for people who walked away in both runs; null if none did. */
+  /** Mean change (min) in entrance-to-give-up for people who walked away in both runs, pooled; null if none did. */
   walkAwayE2sDeltaMin: number | null;
 }
 
