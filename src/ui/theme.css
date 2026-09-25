@@ -1,0 +1,247 @@
+/*
+ * Canteen Sim theme. Light palette on :root; dark palette under prefers-color-scheme (unless light is forced) and
+ * under [data-theme="dark"]. Scene tokens (--scene-*, --cls-*, --seat-*) are #rrggbb: the 3D view reads them.
+ * Person classes and seat states use the Okabe–Ito colour-vision-safe set.
+ */
+:root {
+  --bg: #eef1ef;
+  --panel: #ffffff;
+  --panel-2: #f5f7f6;
+  --ink: #16201c;
+  --muted: #53615b;
+  --line: #d3dad6;
+  --focus: #1f5da8;
+  --accent: #0b6e5f;
+  --accent-ink: #ffffff;
+  --a: #a8400c;
+  --b: #1f5da8;
+  --good: #1d7a3e;
+  --bad: #b3261e;
+  --warn-bg: #fff4d6;
+  --warn-ink: #5b4300;
+
+  --scene-clear: #ffffff;
+  --scene-floor: #e8ece9;
+  --scene-zone: #dfe4e1;
+  --scene-aisle: #d6dcd8;
+  --scene-wall: #c3ccc7;
+  --scene-table: #b9a58a;
+  --scene-chair: #8d8f91;
+  --scene-counter: #7b8a84;
+  --scene-kitchen: #cfd6d2;
+  --scene-tray: #9aa4ab;
+  --scene-door: #0b6e5f;
+  --scene-label: #16201c;
+  --scene-object: #1f5da8;
+  --scene-ring: #e69f00;
+  --scene-contact: #b7bfbb;
+
+  --cls-0: #d55e00;
+  --cls-1: #0072b2;
+  --cls-2: #cc79a7;
+  --cls-3: #e69f00;
+  --cls-4: #009e73;
+  --cls-5: #4b4f54;
+  --cls-6: #7e8e9e;
+
+  --seat-0: #d9dfdb;
+  --seat-1: #56b4e9;
+  --seat-2: #f0e442;
+  --seat-3: #d55e00;
+  --seat-4: #e69f00;
+  --seat-5: #009e73;
+
+  /* Findings charts: reservation level, free flow (blue) to 100% reserving (orange-red). */
+  --lvl-0: #1f5da8;
+  --lvl-1: #5a8fd0;
+  --lvl-2: #8f5cc2;
+  --lvl-3: #b0600f;
+  --lvl-4: #b8430f;
+
+  --radius: 6px;
+  --font: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --fs-0: 12px;
+  --fs-1: 13px;
+  --fs-2: 14px;
+  --fs-3: 16px;
+  --fs-4: 20px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #0f1513;
+    --panel: #161e1b;
+    --panel-2: #1c2622;
+    --ink: #e5ebe8;
+    --muted: #9eaba6;
+    --line: #2d3935;
+    --focus: #8ab8ff;
+    --accent: #4fd1b5;
+    --accent-ink: #0b1411;
+    --a: #ff9a66;
+    --b: #86b6ff;
+    --good: #6fd08c;
+    --bad: #ff8a80;
+    --warn-bg: #3a300f;
+    --warn-ink: #f3dc93;
+
+    --scene-clear: #161e1b;
+    --scene-floor: #25302c;
+    --scene-zone: #2b3632;
+    --scene-aisle: #2f3a36;
+    --scene-wall: #3c4944;
+    --scene-table: #7d6c56;
+    --scene-chair: #5d6266;
+    --scene-counter: #52615b;
+    --scene-kitchen: #333f3b;
+    --scene-tray: #6c767d;
+    --scene-door: #4fd1b5;
+    --scene-label: #e5ebe8;
+    --scene-object: #86b6ff;
+    --scene-ring: #ffb52e;
+    --scene-contact: #1b2320;
+
+    --cls-0: #ff7a1f;
+    --cls-1: #3aa0e8;
+    --cls-2: #e79ac2;
+    --cls-3: #ffb52e;
+    --cls-4: #2fc79a;
+    --cls-5: #9aa1a8;
+    --cls-6: #6c7c8b;
+
+    --seat-0: #3a4642;
+    --seat-1: #6cc3f0;
+    --seat-2: #efe35a;
+    --seat-3: #ff7a1f;
+    --seat-4: #ffb52e;
+    --seat-5: #2fc79a;
+    --lvl-0: #86b6ff;
+    --lvl-1: #4f86d6;
+    --lvl-2: #b48ee0;
+    --lvl-3: #f0a060;
+    --lvl-4: #ff7a45;
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #0f1513;
+  --panel: #161e1b;
+  --panel-2: #1c2622;
+  --ink: #e5ebe8;
+  --muted: #9eaba6;
+  --line: #2d3935;
+  --focus: #8ab8ff;
+  --accent: #4fd1b5;
+  --accent-ink: #0b1411;
+  --a: #ff9a66;
+  --b: #86b6ff;
+  --good: #6fd08c;
+  --bad: #ff8a80;
+  --warn-bg: #3a300f;
+  --warn-ink: #f3dc93;
+
+  --scene-clear: #161e1b;
+  --scene-floor: #25302c;
+  --scene-zone: #2b3632;
+  --scene-aisle: #2f3a36;
+  --scene-wall: #3c4944;
+  --scene-table: #7d6c56;
+  --scene-chair: #5d6266;
+  --scene-counter: #52615b;
+  --scene-kitchen: #333f3b;
+  --scene-tray: #6c767d;
+  --scene-door: #4fd1b5;
+  --scene-label: #e5ebe8;
+  --scene-object: #86b6ff;
+  --scene-ring: #ffb52e;
+  --scene-contact: #1b2320;
+
+  --cls-0: #ff7a1f;
+  --cls-1: #3aa0e8;
+  --cls-2: #e79ac2;
+  --cls-3: #ffb52e;
+  --cls-4: #2fc79a;
+  --cls-5: #9aa1a8;
+  --cls-6: #6c7c8b;
+
+  --seat-0: #3a4642;
+  --seat-1: #6cc3f0;
+  --seat-2: #efe35a;
+  --seat-3: #ff7a1f;
+  --seat-4: #ffb52e;
+  --seat-5: #2fc79a;
+  --lvl-0: #86b6ff;
+  --lvl-1: #4f86d6;
+  --lvl-2: #b48ee0;
+  --lvl-3: #f0a060;
+  --lvl-4: #ff7a45;
+}
+
+/* ---------------------------------------------------------------- base */
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: var(--fs-2) / 1.45 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+#app {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+button,
+select,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.num {
+  font-variant-numeric: tabular-nums;
+}
+.muted {
+  color: var(--muted);
+}
+.eyebrow {
+  font-size: var(--fs-0);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 600;
+}
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+  margin: 0;
+}
+[hidden] {
+  display: none !important;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
