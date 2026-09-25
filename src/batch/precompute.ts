@@ -85,7 +85,9 @@ export function decodeEvidence(ev: Evidence): BatchResult {
   const jobs: Job[] = ev.runs.map((r) => ({ key: r.k, seedIndex: r.i, seed: r.s, fraction: r.f, value: null, cfg: ev.settings }));
   const runs: RunResult[] = ev.runs.map((r) => ({
     key: r.k, seedIndex: r.i, seed: r.s, fraction: r.f, value: null, hash: r.h, pair: null as never,
-    metrics: unflatten(ev.cols, r.m) as unknown as RunMetrics, shareMinEmpty: ev.settings.reserve.shareMinEmpty,
+    // The metric columns hold 7 significant digits; the run's identity comes from its exact fields.
+    metrics: { ...(unflatten(ev.cols, r.m) as unknown as RunMetrics), seed: r.s, reserveFraction: r.f },
+    shareMinEmpty: ev.settings.reserve.shareMinEmpty,
   }));
   const pms = new Map<string, PairMetrics>();
   for (const p of ev.pairs) {
