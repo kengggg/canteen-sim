@@ -1,9 +1,10 @@
-# Optional second host: build the single-file page and publish it to GitHub Pages, by hand only
-# (Actions → Deploy to GitHub Pages → Run workflow). The main site is served by Cloudflare Pages.
-# One-time setup: repository Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# Build the single-file page and publish it to GitHub Pages (https://canteen.lab.patipat.org) on every push to main.
+# One-time setup: Settings → Pages → Source "GitHub Actions" and the custom domain; see README, "Host on GitHub Pages".
 name: Deploy to GitHub Pages
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

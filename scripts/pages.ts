@@ -1,6 +1,6 @@
 /**
- * npm run build:pages — dist/ ready to host (Cloudflare Pages builds this; GitHub Pages or any static host also works):
- * the single-file index.html, checked to be self-contained and within the 1.5 MB budget, plus .nojekyll for GitHub Pages.
+ * npm run build:pages — dist/ ready to host (the Pages workflow deploys it; any static host also works): the single-file
+ * index.html, checked to be self-contained and within the 1.5 MB budget, plus .nojekyll so GitHub Pages serves it as is.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { selfContainedProblems } from './selfcontained';
