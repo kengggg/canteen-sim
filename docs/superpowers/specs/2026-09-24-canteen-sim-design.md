@@ -1369,6 +1369,22 @@ Help text for Reservation-friendly:
 - For any other config the batch view starts empty.
 - CI fails if the embedded hashes differ from a fresh Node run.
 
+### 10.9 Findings data (shipped with the page)
+
+- **What it holds.** Figures behind the Findings panel (§11.13) that the evidence cannot provide, all for the default
+  settings: completely empty tables per minute; reserving groups by arrival time (claimed or fell back); a finer split
+  of busiest-hour reserved seats; walk-away groups classified at the moment they gave up; where the extra entrance-to-seat
+  time goes; and 100% vs 0% on the primary endpoints under eight other settings. Types: `src/batch/findings-data.ts`.
+- **Build step.** `npm run findings` computes them from fresh Node runs of the default sweep (plus 60 runs per extra
+  setting) and writes `src/generated/findings.json` (≈ 20 KB). Instrumentation only reads engine state (the `trace`
+  callback, per-person timestamps, table masks, the seat clock); run hashes must stay identical.
+- **Freshness.** The file records `MODEL_VERSION` and a digest of the evidence run keys and hashes. A test fails when
+  either differs, so a model change that regenerates the evidence also forces the findings to be regenerated. Tests
+  also cross-check every figure the two files share (claims, walk-away groups, seat shares, time totals, the default
+  robustness row).
+- **Everything else is live.** Figures the evidence can provide (headline table, cohorts, group sizes, seat states,
+  lunch-to-lunch spread) are computed from the evidence in the page, never copied into text.
+
 ---
 
 ## 11. Screen and visuals
@@ -1651,6 +1667,19 @@ shared by both scenes, and the old texture is disposed when re-rasterised.
   item is tagged *"Fixed in this model"*.
 - A test checks that every §15 bullet appears in the panel.
 
+### 11.13 Findings panel
+
+- A wide drawer titled **Findings** explains what the default evidence shows, in plain words: a summary, the headline
+  endpoints at every level, why reservation hurts, who pays, where the time goes, how far the result generalises, and
+  limitations. A closing section explains how to read a CSV export.
+- It opens from a **Findings** button in the top bar, from the evidence panel (§10.8), and on load when the page URL's
+  hash is `#findings`.
+- Numbers come from the evidence (§10.8) and the findings data (§10.9) at render time; prose templates only format
+  them. The panel states that it describes the default settings, and when the applied settings differ it says so and
+  points to Batch runs.
+- Charts are inline SVG coloured by theme tokens (seat-state colours for seat states), each with a *Show table*
+  alternative and an accessible name. The panel works at phone width.
+
 ---
 
 ## 12. Architecture
@@ -1661,10 +1690,10 @@ src/
   sim/     (pure TypeScript; no DOM, no three.js, no UI libraries)
            version.ts rng.ts dmath.ts population.ts layout.ts navgraph.ts routing.ts movement.ts
            stalls.ts seating.ts agents.ts metrics.ts events.ts engine.ts
-  batch/   worker.ts runner.ts stats.ts csv.ts precompute.ts
+  batch/   worker.ts runner.ts stats.ts csv.ts precompute.ts findings.ts findings-data.ts
   render/  scene.ts people.ts props.ts overlays.ts labels.ts cameras.ts picking.ts theme.ts
   ui/      app.tsx topbar.tsx settings.tsx assumptions.tsx livestats.tsx batchview.tsx evidence.tsx
-           howto.tsx charts.ts labels.ts theme.css
+           findings.tsx findcharts.tsx findings-model.ts howto.tsx charts.ts labels.ts theme.css
 ```
 
 ### 12.1 Engine interface
