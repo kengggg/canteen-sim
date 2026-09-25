@@ -23,7 +23,7 @@ export const ASSUMPTIONS: AssumptionGroup[] = [
       { text: 'The claim target is chosen near the members’ stalls.' },
       { text: 'Solos and pairs may share a seated reserved table (owner’s rule).', settings: ['reserve.shareMinEmpty', 'reserve.shareMaxParty'] },
       { text: 'Reservers fall back to free flow when no empty table is found.', settings: ['reserve.claimSearchLimit'] },
-      { text: 'Free-flow groups never split: if n seats at one table can’t be found within patience, the whole group walks away (decisions #3, #12). The split-feasible walk-aways diagnostic shows how often scattered seats existed.', settings: ['search.patience'] },
+      { text: 'Free-flow groups never split: if n seats at one table can’t be found within patience, the whole group walks away (decisions #3, #12). The split-feasible walk-aways diagnostic counts groups that gave up while enough free seats existed in total; it does not tell scattered seats apart from a table the searcher never found.', settings: ['search.patience'] },
       { text: 'With search.parallel off (the default), free-flow groupmates with food wait at their stall instead of searching in parallel.', settings: ['search.parallel'] },
       { text: 'The Reservation-friendly preset.' },
     ],

@@ -2017,7 +2017,8 @@ This ledger is also shown in-app (§11.12).
 - Solos and pairs may share a seated reserved table (owner's rule).
 - Reservers fall back to free flow when no empty table is found.
 - Free-flow groups never split: if `n` seats at one table can't be found within patience, the whole group walks away
-  (decisions #3, #12). The *split-feasible walk-aways* diagnostic shows how often scattered seats existed.
+  (decisions #3, #12). The *split-feasible walk-aways* diagnostic counts groups that gave up while enough free seats
+  existed in total; it does not tell scattered seats apart from a table the searcher never found.
 - With `search.parallel` off (the default), free-flow groupmates with food wait at their stall instead of searching in
   parallel.
 - The Reservation-friendly preset.

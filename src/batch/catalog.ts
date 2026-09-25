@@ -52,7 +52,7 @@ export const CATALOG: MetricDef[] = [
   r('turnedAwayHeld', 'Turned away by held or occupied seats', 'asks', null, 'diagnostic', 'Asks refused because seats were taken or kept.'),
   r('fallbackReservers', 'Fallback reservers', 'groups', null, 'diagnostic', 'Reserving groups that found no empty table and ate free-flow.'),
   r('claimSearchMeanMin', 'Claim search time', 'min', null, 'diagnostic', 'Per reserving group: from entry to claiming a table or falling back.'),
-  r('splitFeasibleGroups', 'Split-feasible walk-aways', 'groups', null, 'diagnostic', 'Walk-away groups for which enough free seats existed somewhere, just not together.'),
+  r('splitFeasibleGroups', 'Split-feasible walk-aways', 'groups', null, 'diagnostic', 'Walk-away groups that gave up while the canteen still had at least as many free seats as they had people, so splitting up would have seated them. It does not check whether those seats were scattered: one table may have had room for the whole group.'),
   r('splitFeasiblePeople', 'Split-feasible walk-away people', 'people', null, 'diagnostic', 'People in split-feasible walk-away groups.'),
   r('standingWithFoodPersonMin', 'Standing with food', 'person-min', null, 'diagnostic', 'Person-minutes spent standing still holding food.'),
   r('walkAwayServedAfterDecision', 'Walk-aways served after giving up', 'people', null, 'diagnostic', 'Walk-away people whose food came after their group gave up.'),
