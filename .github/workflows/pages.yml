@@ -1,10 +1,9 @@
-# Build the single-file page and publish it to GitHub Pages.
+# Optional second host: build the single-file page and publish it to GitHub Pages, by hand only
+# (Actions → Deploy to GitHub Pages → Run workflow). The main site is served by Cloudflare Pages.
 # One-time setup: repository Settings → Pages → Build and deployment → Source: "GitHub Actions".
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -23,7 +22,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: npm
       - run: npm ci
       - run: npm run lint

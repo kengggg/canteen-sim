@@ -1,6 +1,6 @@
 /**
- * npm run build:pages — dist/ ready for GitHub Pages (or any static host): the single-file index.html, checked to be
- * self-contained and within the 1.5 MB budget, plus .nojekyll so Pages serves it untouched.
+ * npm run build:pages — dist/ ready to host (Cloudflare Pages builds this; GitHub Pages or any static host also works):
+ * the single-file index.html, checked to be self-contained and within the 1.5 MB budget, plus .nojekyll for GitHub Pages.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { selfContainedProblems } from './selfcontained';
@@ -14,4 +14,4 @@ if (problems.length > 0) {
   process.exit(1);
 }
 writeFileSync(new URL('../dist/.nojekyll', import.meta.url), '');
-console.log(`dist/ is ready for GitHub Pages: index.html (${(Buffer.byteLength(html) / 1024).toFixed(0)} KB, self-contained) and .nojekyll`);
+console.log(`dist/ is ready to host: index.html (${(Buffer.byteLength(html) / 1024).toFixed(0)} KB, self-contained) and .nojekyll`);

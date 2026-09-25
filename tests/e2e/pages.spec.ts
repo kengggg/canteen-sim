@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { expect, test, type BrowserContext } from '@playwright/test';
 
 /**
- * GitHub Pages hosting: the built dist/index.html served as a project site (https://<user>.github.io/<repo>/), with
- * no build server, no claude.ai viewer and no sandbox. Everything the page needs is inside the one file.
+ * Static hosting: the built dist/index.html served as a GitHub Pages project site (https://<user>.github.io/<repo>/) and
+ * from the root of a custom domain (Cloudflare Pages), with no build server, no claude.ai viewer and no sandbox.
+ * Everything the page needs is inside the one file.
  */
 const SITE = 'https://kengggg.github.io/canteen-sim/';
 const html = readFileSync(new URL('../../dist/index.html', import.meta.url));
@@ -70,4 +71,23 @@ test('the self-test runs at ?selftest=1 on Pages', async ({ page, context }) => 
     expect(got[id].hash, id).toBe(g.hash);
     expect(got[id].consistent && got[id].worker, id).toBe(true);
   }
+});
+
+test('served from the root of a custom domain (Cloudflare Pages), the page runs alone and #findings opens the panel', async ({ page, context }) => {
+  const ROOT = 'https://canteen.lab.patipat.org/';
+  await context.route('https://canteen.lab.patipat.org/**', (route) => {
+    const u = new URL(route.request().url());
+    if (u.pathname === '/' || u.pathname === '/index.html') return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
+    return route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
+  });
+  const requests: string[] = [];
+  const errors: string[] = [];
+  page.on('request', (r) => requests.push(r.url()));
+  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('pageerror', (e) => errors.push(String(e)));
+  await page.goto(`${ROOT}#findings`);
+  await expect(page.getByRole('complementary', { name: 'Findings' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'How this works' })).toHaveCount(0);
+  expect(requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'))).toEqual([ROOT]);
+  expect(errors).toEqual([]);
 });

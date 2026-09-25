@@ -1,0 +1,26 @@
+# Checks every pull request and every push to main: lint, types, unit tests and the single-file build.
+# The site itself is deployed by Cloudflare Pages from main (see README, "Host on Cloudflare Pages").
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build:pages
