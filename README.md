@@ -4,10 +4,10 @@ A 3D simulation that tests one question: does informal table reservation (leavin
 table before buying food) make an office canteen less efficient than free flow?
 
 Two identical canteens run side by side on the **same crowd**: the same people arrive at the same moments and
-choose the same food. In canteen **A** a share of groups reserve a whole table first. In canteen **B** nobody reserves.
-Everything else, every random draw included, is identical. Evidence comes from many paired lunches with 95%
-confidence intervals on four primary endpoints fixed in advance: walk-aways, time from entrance to seat (or giving
-up), peak seat utilization and peak throughput.
+have the same tastes (only a longer queue can send someone to a different stall). In canteen **A** a share of groups
+reserve a whole table first. In canteen **B** nobody reserves. Everything else, every random draw included, is
+identical. Evidence comes from many paired lunches with 95% confidence intervals on four primary endpoints fixed in
+advance: walk-aways, time from entrance to seat (or giving up), peak seat utilization and peak throughput.
 
 - **Live page (private claude.ai artifact):** https://claude.ai/artifact/7NBZqCJ7HxeGJ2LCNSnfNv
 - **Design spec:** [`docs/superpowers/specs/2026-09-24-canteen-sim-design.md`](docs/superpowers/specs/2026-09-24-canteen-sim-design.md)

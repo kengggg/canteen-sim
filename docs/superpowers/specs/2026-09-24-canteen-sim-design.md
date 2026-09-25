@@ -1496,7 +1496,8 @@ A dismissible **How this works** panel:
 
 1. *"Left, canteen A: some groups reserve a whole table with a bottle, umbrella or lanyard before buying food. Right,
    canteen B: everyone buys food first, then sits anywhere."*
-2. *"Both canteens get exactly the same people, arriving at the same times and choosing the same food."*
+2. *"Both canteens get exactly the same people, arriving at the same times in the same groups, with the same tastes. A
+   longer queue can still send someone to a different stall."*
 3. *"A glowing ring marks a table with seats kept for someone who isn't there yet."*
 4. *"One lunch can be luck. The Evidence panel shows 30."*
 5. *"Change anything in ⚙; the Assumptions panel lists what's fixed."*

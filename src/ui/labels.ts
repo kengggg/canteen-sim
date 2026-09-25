@@ -58,7 +58,7 @@ export const ADVANTAGE_HELP = 'Positive means free flow did better.';
 
 export const HOWTO_STEPS = [
   'Left, canteen A: some groups reserve a whole table with a bottle, umbrella or lanyard before buying food. Right, canteen B: everyone buys food first, then sits anywhere.',
-  'Both canteens get exactly the same people, arriving at the same times and choosing the same food.',
+  'Both canteens get exactly the same people, arriving at the same times in the same groups, with the same tastes. A longer queue can still send someone to a different stall.',
   'A glowing ring marks a table with seats kept for someone who isn’t there yet.',
   'One lunch can be luck. The Evidence panel shows 30.',
   'Change anything in ⚙; the Assumptions panel lists what’s fixed.',
