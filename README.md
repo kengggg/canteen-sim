@@ -25,6 +25,7 @@ npm test               # unit and rule tests (Vitest)
 npm run test:sanity    # model-sanity suite: 30-seed checks, 200 fast-check configs, evidence freshness (~3 min)
 npm run bench          # A (100%) and B at defaults; fails on > 10% event drift or a median over 3 s
 npm run precompute     # re-run the default reservation sweep (150 runs) into src/generated/evidence.json
+npm run findings       # Findings panel figures (instrumented sweep + 8 other settings) into src/generated/findings.json (~6 min)
 npm run golden:update  # Node reference hashes for the cross-browser self-test
 npm run build          # dist/index.html — one self-contained file
 npm run build:pages    # the same, checked self-contained (≤ 1.5 MB), plus dist/.nojekyll for GitHub Pages
