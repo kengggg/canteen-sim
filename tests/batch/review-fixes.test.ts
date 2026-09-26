@@ -25,7 +25,7 @@ test('F1: a "worse" sentence prints the interval with the same sign as its magni
 
 test('F6: the P1 headline reads as a rate, and throughput reads per hour', () => {
   const clear = pairedStat([2, 3, 2.5, 3.5, 2, 3, 2.5, 3, 2, 3]);
-  expect(sentence(METRIC_BY_ID.get('walkAwayPct')!, 1, clear, null)).toMatch(/^At 100% reservation, the walk-away rate was /);
+  expect(sentence(METRIC_BY_ID.get('leftPct')!, 1, clear, null)).toMatch(/^At 100% reservation, the share of people who left without eating was /);
   expect(sentence(METRIC_BY_ID.get('peakThroughputPerHour')!, 1, pairedStat([10, 12, 11, 9, 10, 12, 11, 9, 10, 11]), null)).toMatch(/people per hour better/);
 });
 
@@ -42,7 +42,8 @@ test('F3: evidence keeps every RunMetric (except per-stall counts) and decodes t
   const r0 = results[4].metrics, d0 = d.runs[4].metrics;
   expect(d0.seated).toBe(r0.seated);
   expect(d0.arrivals).toBe(r0.arrivals);
-  expect(d0.bySize).toEqual(r0.bySize.map((x) => ({ ...x, walkAwayPct: x.walkAwayPct === null ? null : Number(x.walkAwayPct.toPrecision(7)), entranceToSeatMeanMin: x.entranceToSeatMeanMin === null ? null : Number(x.entranceToSeatMeanMin.toPrecision(7)), foodToSeatMeanMin: x.foodToSeatMeanMin === null ? null : Number(x.foodToSeatMeanMin.toPrecision(7)) })));
+  const p7 = (v: number | null) => (v === null ? null : Number(v.toPrecision(7)));
+  expect(d0.bySize).toEqual(r0.bySize.map((x) => ({ ...x, leftPct: p7(x.leftPct), entranceToSeatMeanMin: p7(x.entranceToSeatMeanMin), plateMeanMin: p7(x.plateMeanMin) })));
   expect(d0.openToSmallDuringDemand).toBeCloseTo(r0.openToSmallDuringDemand, 6);
   expect(d0.eventsPerKind).toEqual(r0.eventsPerKind);
 });
@@ -69,10 +70,10 @@ test('F4: the CSV writes the effective shareMinEmpty of each run in a shareMinEm
 });
 
 test('F5: cohort and group-size breakdowns get paired statistics with the same seed dropping', () => {
-  const s = b.cohortStats.find((x) => x.fraction === 1 && x.cohort === 'R' && x.metric === 'walkAwayPct')!;
+  const s = b.cohortStats.find((x) => x.fraction === 1 && x.cohort === 'R' && x.metric === 'leftPct')!;
   const pm = b.pairs.find((p) => p.fraction === 1 && p.seedIndex === 0)!.pm;
-  expect(s.a[0]).toBe(pm.cohorts.R.level.walkAwayPct);
-  expect(s.b[0]).toBe(pm.cohorts.R.baseline.walkAwayPct);
+  expect(s.a[0]).toBe(pm.cohorts.R.level.leftPct);
+  expect(s.b[0]).toBe(pm.cohorts.R.baseline.leftPct);
   expect(s.adv.n).toBe(3);
   const z = b.sizeStats.find((x) => x.fraction === 0.5 && x.size === 2 && x.metric === 'entranceToSeatMeanMin')!;
   const A = results.find((r) => r.fraction === 0.5 && r.seedIndex === 1)!, B0 = results.find((r) => r.fraction === 0 && r.seedIndex === 1)!;
@@ -81,8 +82,8 @@ test('F5: cohort and group-size breakdowns get paired statistics with the same s
   const copy = results.map((r) => ({ ...r, metrics: { ...r.metrics } }));
   copy.find((r) => r.fraction === 0 && r.seedIndex === 2)!.metrics.truncated = true;
   const t = aggregate('reservation', jobs, copy);
-  expect(t.cohortStats.find((x) => x.fraction === 1 && x.cohort === 'N' && x.metric === 'walkAwayPct')!.a[2]).toBeNull();
-  expect(t.sizeStats.find((x) => x.fraction === 1 && x.size === 1 && x.metric === 'walkAwayPct')!.a[2]).toBeNull();
+  expect(t.cohortStats.find((x) => x.fraction === 1 && x.cohort === 'N' && x.metric === 'leftPct')!.a[2]).toBeNull();
+  expect(t.sizeStats.find((x) => x.fraction === 1 && x.size === 1 && x.metric === 'leftPct')!.a[2]).toBeNull();
 });
 
 test('F8: a hidden page waits on the slow timer, not the message loop', async () => {

@@ -9,7 +9,7 @@ export const CLASS_LABELS = [
   'Searching with food',
   'Holding seats',
   'Eating',
-  'Walked away',
+  'Left without eating',
   'Walking',
 ];
 export const CLASS_HELP = [
@@ -18,7 +18,7 @@ export const CLASS_HELP = [
   'Carrying food and looking for a table where the whole group fits.',
   'Seated while groupmates are still on their way.',
   'Seated: eating, waiting for groupmates to finish, or lingering.',
-  'Gave up on a seat and is leaving with takeaway.',
+  'Left before getting food: at the door, or after queuing too long. Plates can’t be taken away, so nobody leaves holding food.',
   'Entering, walking to a stall or a seat, waiting for the group, or heading to the tray return and exit.',
 ];
 
@@ -36,6 +36,11 @@ export const seatOpenLabel = (n: number) => `Reserved, open to parties of ≤ ${
 export const LEGEND_TRAY = 'Carrying a tray';
 export const LEGEND_RING = 'Seats kept for someone not here yet';
 export const LEGEND_OBJECT = 'Reservation object (bottle, umbrella or lanyard)';
+/** Hover-card detail for people who left, and for split-mode searchers (design §6.4). */
+export const LEFT_LABELS = ['', 'Left: queues too long', 'Left: no room in sight', 'Left: queues too long and no room in sight', 'Left: waited too long in the queue'];
+export const COLLECTING_LABEL = 'Collecting the object';
+export const SPLITTING_LABEL = 'Searching with food, willing to split';
+
 export const OBJECT_NAMES = ['bottle', 'umbrella', 'lanyard'];
 
 export const CANTEEN_A = 'A · Reservation';
@@ -47,9 +52,9 @@ export const COUNTERS: { id: string; label: string; help: string }[] = [
   { id: 'searching', label: 'Searching with food', help: 'Free-flow searchers carrying food and looking for a table.' },
   { id: 'claiming', label: 'Claiming a table', help: 'People looking for a table to reserve, or placing the object.' },
   { id: 'standing', label: 'Standing with food', help: 'People holding food who are standing still.' },
-  { id: 'walkAways', label: 'Walk-aways so far', help: 'People whose group gave up on finding a table.' },
+  { id: 'left', label: 'Left without eating so far', help: 'People who left before getting food: at the door (queues or seating looked too bad) or from a queue (waited past their limit).' },
   { id: 'sits60', label: 'Sat down in the last hour', help: 'Sit starts in the last 60 minutes of sim time.' },
-  { id: 'e2s', label: 'Entrance to seat so far', help: 'Mean minutes from the entrance to sitting down or giving up; people still searching count up to now.' },
+  { id: 'e2s', label: 'Entrance to seat so far', help: 'Mean minutes from the entrance to sitting down, over the people who have sat so far.' },
 ];
 
 export const STRIP_TITLE = 'Free-flow advantage';

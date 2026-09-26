@@ -18,7 +18,7 @@ export interface Evidence {
   pairs: { k: string; w: [number, number]; p3: [number, number]; sh: number[]; c: Record<string, (number | null)[]> }[];
 }
 
-const COHORT_FIELDS: (keyof CohortStats)[] = ['groups', 'people', 'walkAwayPct', 'entranceToSeatMeanMin', 'entranceToSeatMedianMin', 'entranceToSeatP90Min', 'foodToSeatMeanMin'];
+const COHORT_FIELDS: (keyof CohortStats)[] = ['groups', 'people', 'leftPct', 'entranceToSeatMeanMin', 'entranceToSeatMedianMin', 'entranceToSeatP90Min', 'plateMeanMin'];
 const sig = (x: number | null) => (x === null ? null : Number(x.toPrecision(7)));
 const OMIT = new Set(['stallServed']);
 

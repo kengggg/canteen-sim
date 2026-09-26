@@ -24,10 +24,10 @@ test('aggregation pairs each level with its baseline seed and computes stats for
   const b = aggregate('reservation', jobs, results);
   expect(b.pairs).toHaveLength(4 * 3);
   expect(b.stats.some((s) => s.fraction === 0)).toBe(false);
-  const p1 = b.stats.find((s) => s.fraction === 1 && s.metricId === 'walkAwayPct')!;
+  const p1 = b.stats.find((s) => s.fraction === 1 && s.metricId === 'leftPct')!;
   expect(p1.adv.n).toBe(3);
   const at = (f: number, i: number) => results.find((r) => r.fraction === f && r.seedIndex === i)!;
-  const expected = at(1, 0).metrics.walkAwayPct! - at(0, 0).metrics.walkAwayPct!;
+  const expected = at(1, 0).metrics.leftPct! - at(0, 0).metrics.leftPct!;
   expect(p1.a[0]! - p1.b[0]!).toBeCloseTo(expected, 12);
   // P3 uses the pair's own window.
   const pm = pairMetrics(at(0.5, 1).pair, at(0, 1).pair, 0.5);
@@ -40,8 +40,8 @@ test('a truncated run drops its seed from that level’s statistics', () => {
   const copy = results.map((r) => ({ ...r, metrics: { ...r.metrics } }));
   copy.find((r) => r.fraction === 0.25 && r.seedIndex === 2)!.metrics.truncated = true;
   const b = aggregate('reservation', jobs, copy);
-  const s = b.stats.find((x) => x.fraction === 0.25 && x.metricId === 'walkAwayPct')!;
+  const s = b.stats.find((x) => x.fraction === 0.25 && x.metricId === 'leftPct')!;
   expect(s.adv.nUsed).toBe(2);
   expect(b.truncated.find((t) => t.fraction === 0.25)!.count).toBe(1);
-  expect(b.stats.find((x) => x.fraction === 0.5 && x.metricId === 'walkAwayPct')!.adv.nUsed).toBe(3);
+  expect(b.stats.find((x) => x.fraction === 0.5 && x.metricId === 'leftPct')!.adv.nUsed).toBe(3);
 });

@@ -50,8 +50,8 @@ export interface BreakdownStat {
   adv: PairedStat;
 }
 export type CohortName = 'R' | 'N' | 'Rclaimed' | 'Rfallback';
-export const COHORT_METRICS = ['walkAwayPct', 'entranceToSeatMeanMin', 'entranceToSeatMedianMin', 'entranceToSeatP90Min', 'foodToSeatMeanMin'] as const;
-export const SIZE_METRICS = ['walkAwayPct', 'entranceToSeatMeanMin', 'foodToSeatMeanMin'] as const;
+export const COHORT_METRICS = ['leftPct', 'plateMeanMin', 'entranceToSeatMeanMin', 'entranceToSeatMedianMin', 'entranceToSeatP90Min'] as const;
+export const SIZE_METRICS = ['leftPct', 'plateMeanMin', 'entranceToSeatMeanMin'] as const;
 
 export interface BatchResult {
   kind: 'reservation' | 'sensitivity';

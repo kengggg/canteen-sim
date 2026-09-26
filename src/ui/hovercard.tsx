@@ -1,4 +1,4 @@
-import { CLASS_LABELS, OBJECT_NAMES, SEAT_LABELS, seatOpenLabel } from './labels';
+import { CLASS_LABELS, COLLECTING_LABEL, LEFT_LABELS, OBJECT_NAMES, SEAT_LABELS, SPLITTING_LABEL, seatOpenLabel } from './labels';
 import { applied, controller, hover, tick } from './store';
 
 /** Hover / tap card for a person or a table (spec §11.7). */
@@ -19,6 +19,7 @@ export function HoverCard() {
         <b>{h.side === 0 ? 'A' : 'B'} · group {s.groupId[s.personGroup[p]]}</b>
         <span>Group of {s.groupSize[p]}{h.side === 0 && s.isReserver[p] ? (v.isClaimer[p] ? ' · claimer' : ' · reserver') : ''}</span>
         <span>{CLASS_LABELS[v.cls[p]]}, {mins} min</span>
+        {v.collecting[p] === 1 ? <span>{COLLECTING_LABEL}</span> : v.leftKind[p] !== 0 ? <span>{LEFT_LABELS[v.leftKind[p]]}</span> : v.splitting[p] === 1 && v.cls[p] === 2 ? <span>{SPLITTING_LABEL}</span> : null}
       </div>
     );
   }

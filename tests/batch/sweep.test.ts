@@ -51,7 +51,7 @@ test('a seatsPerSide sweep clamps shareMinEmpty per value and warns when sharing
 });
 
 test('catalogue: P1–P4 are primary with the right direction', () => {
-  expect(PRIMARY.map((m) => [m.id, m.better])).toEqual([['walkAwayPct', 'lower'], ['entranceToSeatMeanMin', 'lower'], ['peakUtilization', 'higher'], ['peakThroughputPerHour', 'higher']]);
+  expect(PRIMARY.map((m) => [m.id, m.better])).toEqual([['leftPct', 'lower'], ['plateMeanMin', 'lower'], ['peakUtilization', 'higher'], ['peakThroughputPerHour', 'higher']]);
   expect(CATALOG.filter((m) => m.cls === 'diagnostic').every((m) => m.better === null)).toBe(true);
   expect(new Set(CATALOG.map((m) => m.id)).size).toBe(CATALOG.length);
 });

@@ -16,8 +16,8 @@ export function EndCard() {
   const a = controller.A.metrics(), b = controller.B.metrics();
   const pm = pairMetrics(controller.A.pairInput(), controller.B.pairInput(), applied.value.reserve.percentA);
   const rows: [string, number | null, number | null, 'lower' | 'higher', string, number][] = [
-    ['Walk-aways (%)', a.walkAwayPct, b.walkAwayPct, 'lower', 'pp', 1],
-    ['Entrance to seat or giving up (min)', a.entranceToSeatMeanMin, b.entranceToSeatMeanMin, 'lower', 'min', 2],
+    ['Left without eating (%)', a.leftPct, b.leftPct, 'lower', 'pp', 1],
+    ['Time carrying a plate (min)', a.plateMeanMin, b.plateMeanMin, 'lower', 'min', 2],
     ['Peak seat utilization (%)', pm.p3Level * 100, pm.p3Baseline * 100, 'higher', 'pp', 1],
     ['Peak throughput (people/h)', a.peakThroughputPerHour, b.peakThroughputPerHour, 'higher', '/h', 0],
   ];

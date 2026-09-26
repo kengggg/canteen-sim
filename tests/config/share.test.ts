@@ -115,8 +115,29 @@ test('every §15 ledger bullet appears in the Assumptions panel data', () => {
   const norm = (s: string) => s.replace(/[`*]/g, '').replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
   const bullets = sec.split('\n- ').slice(1).map((b) => norm(b.split('\n\n')[0]));
   const texts = new Set(ASSUMPTIONS.flatMap((g) => g.items.map((i) => norm(i.text))));
-  expect(bullets.length).toBe(26);
+  expect(bullets.length).toBe(32);
   for (const b of bullets) expect(texts.has(b)).toBe(true);
   const headings = [...sec.matchAll(/\*\*(.+?)\*\*/g)].map((m) => norm(m[1]));
   expect(ASSUMPTIONS.map((g) => norm(g.heading))).toEqual(headings);
+});
+
+test('Review Focus 5: a model-1 link with patience loads with the notice and default leave settings', () => {
+  const d = parseShared('#v=1&m=1&seed=7&search.patience=600&crowd.totalPeople=1200');
+  expect(d.ok).toBe(true);
+  if (!d.ok) return;
+  const r = applyValues(d.values, d.model);
+  expect(r.modelNotice).toEqual({ from: 1, to: MODEL_VERSION });
+  expect(r.cfg.crowd.totalPeople).toBe(1200);
+  expect(r.cfg.seed).toBe(7);
+  expect(r.cfg.leave).toEqual(defaultConfig().leave);
+  expect(r.cfg.search).toEqual(defaultConfig().search);
+  expect('patience' in r.cfg.search).toBe(false);
+  const json = JSON.stringify({ app: 'canteen-sim', v: 1, model: 1, settings: { ...defaultConfig(), search: { visibility: 10, patience: 600, parallel: false, emptyTableDetour: 0 } } });
+  const j = importJson(json);
+  expect('error' in j).toBe(false);
+  if (!('error' in j)) {
+    expect('patience' in j.cfg.search).toBe(false);
+    expect(j.cfg.search.splitAfter).toBe(120);
+    expect(j.modelNotice).toEqual({ from: 1, to: MODEL_VERSION });
+  }
 });

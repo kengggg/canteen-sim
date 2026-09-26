@@ -12,7 +12,7 @@ test('evidence round-trips: decoded statistics equal the direct aggregation (7 s
   const b = aggregate('reservation', jobs, jobs.map(runJob));
   const ev = JSON.parse(JSON.stringify(encodeEvidence(b, c))) as Evidence;
   const d = decodeEvidence(ev);
-  for (const id of ['walkAwayPct', 'entranceToSeatMeanMin', 'peakUtilization', 'peakThroughputPerHour', 'queueWaitMeanMin']) {
+  for (const id of ['leftPct', 'plateMeanMin', 'peakUtilization', 'peakThroughputPerHour', 'queueWaitMeanMin']) {
     for (const f of [0.25, 1]) {
       const x = b.stats.find((s) => s.metricId === id && s.fraction === f)!.adv;
       const y = d.stats.find((s) => s.metricId === id && s.fraction === f)!.adv;

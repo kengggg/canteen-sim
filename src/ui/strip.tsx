@@ -23,8 +23,8 @@ function endpointRows(): Row[] {
     p3b = pm.p3Baseline;
   }
   return [
-    { id: 'p1', label: 'Walk-aways', unit: 'pp', better: 'lower', a: mA ? mA.walkAwayPct : lA.walkAwayPct, b: mB ? mB.walkAwayPct : lB.walkAwayPct, digits: 1, scale: 1 },
-    { id: 'p2', label: 'Entrance to seat', unit: 'min', better: 'lower', a: mA ? mA.entranceToSeatMeanMin : lA.entranceToSeatMeanMin, b: mB ? mB.entranceToSeatMeanMin : lB.entranceToSeatMeanMin, digits: 2, scale: 1 },
+    { id: 'p1', label: 'Left without eating', unit: 'pp', better: 'lower', a: mA ? mA.leftPct : lA.leftPct, b: mB ? mB.leftPct : lB.leftPct, digits: 1, scale: 1 },
+    { id: 'p2', label: 'Time carrying a plate', unit: 'min', better: 'lower', a: mA ? mA.plateMeanMin : lA.plateMeanMin, b: mB ? mB.plateMeanMin : lB.plateMeanMin, digits: 2, scale: 1 },
     { id: 'p3', label: 'Peak seat utilization', unit: 'pp', better: 'higher', a: p3a, b: p3b, digits: 1, scale: 100 },
     { id: 'p4', label: 'Peak throughput', unit: '/h', better: 'higher', a: mA ? mA.peakThroughputPerHour : lA.peakThroughputPerHour, b: mB ? mB.peakThroughputPerHour : lB.peakThroughputPerHour, digits: 0, scale: 1 },
   ];

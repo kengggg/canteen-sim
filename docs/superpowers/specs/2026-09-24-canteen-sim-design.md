@@ -1136,10 +1136,13 @@ default, min, max, step and help text. From it are generated:
 | Eating | `eat.mean` | 18 min | 3–60 min | 1 min | |
 | | `eat.cv` | 0.30 | 0–1 | 0.05 | |
 | | `eat.linger` | 0 min | 0–30 min | 1 min | |
+| Leaving | `leave.waitMean` | 10 min | 0.5–60 min | 0.5 min | average wait limit (model 2) |
+| | `leave.waitCV` | 0.50 | 0–1.5 | 0.05 | spread of wait limits; 0 = every group the same |
+| | `leave.roomNeeded` | 3 | 0–20 | 1 | tables that must look like a fit for a group with the average limit; 0 = no seating check |
 | Movement & search | `move.walkSpeed` | 1.30 m/s | 0.5–2.0 | 0.05 | |
 | | `move.traySpeed` | 1.00 m/s | 0.3–2.0 | 0.05 | |
 | | `search.visibility` | 10 m | 2–100 m | 1 m | ≥ hall diagonal = sees the whole hall |
-| | `search.patience` | 5 min | 0.5–30 min | 0.5 min | |
+| | `search.splitAfter` | 2 min | 0–30 min | 0.5 min | circling before a group accepts seats at more than one table (model 2) |
 | | `search.parallel` | off | off / on | — | §5.10 |
 | | `search.emptyTableDetour` | 0 m | 0–40 m | 1 m | §5.10 |
 | Tray return | `tray.dropTime` | 5 s | 1–60 s | 1 s | |
@@ -2046,12 +2049,11 @@ This ledger is also shown in-app (§11.12).
 - The claim target is chosen near the members' stalls.
 - Solos and pairs may share a seated reserved table (owner's rule).
 - Reservers fall back to free flow when no empty table is found.
-- Free-flow groups never split: if `n` seats at one table can't be found within patience, the whole group walks away
-  (decisions #3, #12). The *split-feasible walk-aways* diagnostic counts groups that gave up while enough free seats
-  existed in total; it does not tell scattered seats apart from a table the searcher never found.
+- Free-flow groups circle for 2 minutes before splitting across tables. A group with a claimed table never needs to.
 - With `search.parallel` off (the default), free-flow groupmates with food wait at their stall instead of searching in
   parallel.
 - The Reservation-friendly preset.
+- People circling with plates don't make the hall look fuller from the door. Canteen A has more of them.
 
 **Built in — helps free flow**
 
@@ -2060,6 +2062,9 @@ This ledger is also shown in-app (§11.12).
 - Visibility has no occlusion.
 - People waiting at nodes block no one. R6 waiters standing with food are almost all free-flow. The *standing with
   food* counter and person-minutes make this visible.
+- From the door, a table with an object looks fully taken, even when its group is seated and the table is open to
+  small parties.
+- From the door, seats held for groupmates look empty. Free flow holds more seats this way.
 
 **Direction unclear**
 
@@ -2073,7 +2078,10 @@ This ledger is also shown in-app (§11.12).
 - Mesoscopic lanes instead of collisions.
 - Static routing.
 - Everyone can see queue lengths.
-- Fixed patience.
+- Each group's wait limit and room needed come from one draw, fixed for its visit.
+- Waits are estimated as people in the queue × the average service time.
+- Plates can't be taken away: nobody leaves once being served or holding food.
+- Groupmates queuing at different stalls give up separately.
 - The same eating-time distribution.
 - Held seats look empty from afar, and sitting at any table where someone is seated requires asking.
 

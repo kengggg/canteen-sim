@@ -16,6 +16,6 @@ export function evidenceBatch(): BatchResult {
 /** The P1 sentence at 100% vs 0% for the top-bar Evidence line. */
 export function evidenceSentence(): string {
   const b = evidenceBatch();
-  const s = b.stats.find((x) => x.metricId === 'walkAwayPct' && x.fraction === 1);
-  return s ? sentence(METRIC_BY_ID.get('walkAwayPct')!, 1, s.adv, s.wins) : '';
+  const s = b.stats.find((x) => x.metricId === 'leftPct' && x.fraction === 1);
+  return s ? sentence(METRIC_BY_ID.get('leftPct')!, 1, s.adv, s.wins) : '';
 }

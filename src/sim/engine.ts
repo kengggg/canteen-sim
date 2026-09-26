@@ -51,6 +51,8 @@ export interface View {
   leftKind: Uint8Array;
   /** 1 when the person's party is willing to split (design §2.6). */
   splitting: Uint8Array;
+  /** 1 for a reserving group's last member walking back for the object. */
+  collecting: Uint8Array;
   since: Float64Array;
   x0: Float32Array;
   y0: Float32Array;
@@ -355,7 +357,7 @@ export class Sim implements Engine {
     const S = w.pc.L.seats.length;
     const v = (this.viewBuf ??= {
       version: 0, nowMs: 0,
-      active: new Uint8Array(P), cls: new Uint8Array(P), tray: new Uint8Array(P), left: new Uint8Array(P), leftKind: new Uint8Array(P), splitting: new Uint8Array(P), since: new Float64Array(P),
+      active: new Uint8Array(P), cls: new Uint8Array(P), tray: new Uint8Array(P), left: new Uint8Array(P), leftKind: new Uint8Array(P), splitting: new Uint8Array(P), collecting: new Uint8Array(P), since: new Float64Array(P),
       x0: new Float32Array(P), y0: new Float32Array(P), x1: new Float32Array(P), y1: new Float32Array(P),
       t0: new Float64Array(P), t1: new Float64Array(P), laneOffset: new Float32Array(P), leader: new Int32Array(P),
       waitKind: new Uint8Array(P), waitRank: new Int32Array(P), waitNode: new Int32Array(P), waitToward: new Int32Array(P), seat: new Int32Array(P), isClaimer: new Uint8Array(P),
@@ -384,6 +386,7 @@ export class Sim implements Engine {
       v.left[p] = w.leftKind[p] !== 0 ? 1 : 0;
       v.leftKind[p] = w.leftKind[p];
       v.splitting[p] = grp.splitMode && grp.committedTable < 0 ? 1 : 0;
+      v.collecting[p] = w.collecting[p];
       v.since[p] = w.phaseSince[p];
       v.isClaimer[p] = grp.claimer === p ? 1 : 0;
       if (ph === PH.SITTING || ph === PH.EATING || ph === PH.STANDING) v.seat[p] = w.seat[p];

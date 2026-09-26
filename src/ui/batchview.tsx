@@ -107,8 +107,8 @@ function DiffChart({ r, m }: { r: BatchResult; m: MetricDef }) {
 }
 
 function Breakdowns({ r, at }: { r: BatchResult; at: number }) {
-  const cohorts = [['R', 'Reservers (claimed or fell back)'], ['Rclaimed', 'Reservers who claimed a table'], ['Rfallback', 'Reservers who fell back'], ['N', 'Everyone else']] as const;
-  const m = METRIC_BY_ID.get('walkAwayPct')!, e = METRIC_BY_ID.get('entranceToSeatMeanMin')!;
+  const cohorts = [['R', 'Reserving groups (all)'], ['Rclaimed', 'Reservers who claimed a table'], ['Rfallback', 'Reservers who fell back'], ['N', 'Everyone else']] as const;
+  const m = METRIC_BY_ID.get('leftPct')!, e = METRIC_BY_ID.get('entranceToSeatMeanMin')!;
   const cell = (s: { adv: { mean: number | null; halfWidth: number | null } } | undefined, d: MetricDef) =>
     !s || s.adv.mean === null ? '—' : `${fmt(s.adv.mean, d)}${s.adv.halfWidth === null ? '' : ` ± ${fmtNonZero(s.adv.halfWidth, d)}`}`;
   const lv = (s: { fraction: number; value: number | null }) => (r.kind === 'reservation' ? s.fraction === at : s.value === at);
@@ -117,14 +117,14 @@ function Breakdowns({ r, at }: { r: BatchResult; at: number }) {
       <div class="table-scroll">
         <table class="data">
           <caption>Group size · free-flow advantage at {r.kind === 'reservation' ? pctLabel(at) : fmtSetting(r.setting!, at)}</caption>
-          <thead><tr><th scope="col">Size</th><th scope="col">Walk-aways (pp)</th><th scope="col">Entrance to seat (min)</th><th scope="col">Food to seat (min)</th></tr></thead>
+          <thead><tr><th scope="col">Size</th><th scope="col">Left without eating (pp)</th><th scope="col">Time carrying a plate (min)</th><th scope="col">Entrance to seat (min)</th></tr></thead>
           <tbody>
             {[1, 2, 3, 4, 5, 6].map((size) => (
               <tr key={size}>
                 <th scope="row">{size}</th>
-                <td class="num">{cell(r.sizeStats.find((s) => s.size === size && s.metric === 'walkAwayPct' && lv(s)), m)}</td>
+                <td class="num">{cell(r.sizeStats.find((s) => s.size === size && s.metric === 'leftPct' && lv(s)), m)}</td>
+                <td class="num">{cell(r.sizeStats.find((s) => s.size === size && s.metric === 'plateMeanMin' && lv(s)), e)}</td>
                 <td class="num">{cell(r.sizeStats.find((s) => s.size === size && s.metric === 'entranceToSeatMeanMin' && lv(s)), e)}</td>
-                <td class="num">{cell(r.sizeStats.find((s) => s.size === size && s.metric === 'foodToSeatMeanMin' && lv(s)), e)}</td>
               </tr>
             ))}
           </tbody>
@@ -133,18 +133,18 @@ function Breakdowns({ r, at }: { r: BatchResult; at: number }) {
       <div class="table-scroll">
         <table class="data">
           <caption>Reserver cohorts · A − B (positive = free flow better)</caption>
-          <thead><tr><th scope="col">Cohort</th><th scope="col">Walk-aways (pp)</th><th scope="col">Entrance to seat, mean (min)</th><th scope="col">median</th><th scope="col">p90</th><th scope="col">Food to seat, mean (min)</th></tr></thead>
+          <thead><tr><th scope="col">Cohort</th><th scope="col">Left without eating (pp)</th><th scope="col">Time carrying a plate, mean (min)</th><th scope="col">Entrance to seat, mean (min)</th><th scope="col">median</th><th scope="col">p90</th></tr></thead>
           <tbody>
             {cohorts.map(([id, label]) => {
               const get = (metric: string) => r.cohortStats.find((s) => s.cohort === id && s.metric === metric && lv(s));
               return (
                 <tr key={id}>
                   <th scope="row">{label}</th>
-                  <td class="num">{cell(get('walkAwayPct'), m)}</td>
+                  <td class="num">{cell(get('leftPct'), m)}</td>
+                  <td class="num">{cell(get('plateMeanMin'), e)}</td>
                   <td class="num">{cell(get('entranceToSeatMeanMin'), e)}</td>
                   <td class="num">{cell(get('entranceToSeatMedianMin'), e)}</td>
                   <td class="num">{cell(get('entranceToSeatP90Min'), e)}</td>
-                  <td class="num">{cell(get('foodToSeatMeanMin'), e)}</td>
                 </tr>
               );
             })}

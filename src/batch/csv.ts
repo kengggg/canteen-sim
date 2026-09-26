@@ -12,8 +12,6 @@ function runColumns(r: RunMetrics): [string, Cell][] {
   const out: [string, Cell][] = [];
   for (const [k, v] of Object.entries(r)) {
     if (k === 'eventsPerKind') (v as number[]).forEach((x, i) => out.push([`eventsPerKind_k${i + 1}`, x]));
-    else if (k === 'splitFeasibleGroupsBySize') (v as number[]).forEach((x, i) => out.push([`splitFeasibleGroups_s${i + 1}`, x]));
-    else if (k === 'splitFeasiblePeopleBySize') (v as number[]).forEach((x, i) => out.push([`splitFeasiblePeople_s${i + 1}`, x]));
     else if (k === 'stallServed') (v as number[]).forEach((x, i) => out.push([`stallServed_${i + 1}`, x]));
     else if (k === 'bySize') {
       for (const b of v as RunMetrics['bySize']) for (const [f, x] of Object.entries(b)) if (f !== 'size') out.push([`bySize_s${b.size}_${f}`, x as Cell]);

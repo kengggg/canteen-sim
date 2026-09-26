@@ -37,7 +37,7 @@ function values(live: Live, isA: boolean): string[] {
     int(live.searchingWithFood),
     isA ? int(live.claiming) : '—',
     int(live.standingWithFood),
-    int(live.walkAways),
+    `${int(live.left)} (door ${int(live.leftDoor)} · queue ${int(live.leftQueue)})`,
     int(live.sitStartsLast60),
     live.entranceToSeatMeanMin === null ? '—' : `${num(live.entranceToSeatMeanMin, 1)} min`,
   ];
