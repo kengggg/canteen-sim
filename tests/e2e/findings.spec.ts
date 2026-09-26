@@ -12,17 +12,17 @@ function watchErrors(page: Page): string[] {
   return errors;
 }
 
-const SECTIONS = ['In short', 'How the comparison works', '1. Reservation loses on every headline measure', '2. Why: idle seats in the rush', '3. Who pays', '4. Where the time goes', 'What it means', 'How far it generalises', 'Limitations'];
+const SECTIONS = ['In short', 'How the comparison works', '1. Reservation loses on every headline measure', '2. Why: idle seats in the rush, and a hall that looks full', '3. Who pays', '4. Where the time goes', 'What it means', 'How far it generalises', 'Limitations'];
 
-test('Findings opens from the top bar with every section, its tables and four charts', async ({ page }) => {
+test('Findings opens from the top bar with every section, its tables and six charts', async ({ page }) => {
   const errors = watchErrors(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Findings', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Findings' });
   await expect(panel).toBeVisible();
   for (const h of SECTIONS) await expect(panel.getByRole('heading', { name: h, exact: true })).toBeVisible();
-  await expect(panel.locator('.flead')).toContainText('7.7% of diners walk away instead of 2.7%');
-  await expect(panel.locator('.fchart .fsvg svg')).toHaveCount(4);
+  await expect(panel.locator('.flead')).toContainText('21.4% of the people who come to lunch leave without eating instead of 16.6%');
+  await expect(panel.locator('.fchart .fsvg svg')).toHaveCount(6);
   await expect(panel.locator('table.fhead tbody tr')).toHaveCount(5);
   await expect(panel.getByText('Your current settings differ')).toHaveCount(0);
   expect(errors).toEqual([]);
@@ -72,23 +72,24 @@ test('the rendered prose and tables carry the evidence and findings figures', as
   const panel = page.getByRole('complementary', { name: 'Findings' });
   const text = await panel.innerText();
   for (const s of [
-    '2.9 times as many walk-aways.',
-    '49 to 139 people per lunch',
-    'about two-thirds of the walk-away, seat-use and throughput losses (64–69%)',
-    'reservers who find no table most of all',
-    'most of them (89%) for groupmates still getting food',
+    'More people leave without eating.',
+    '299 to 385 people per lunch',
+    'about two-thirds of the leaving, seat-use and throughput losses (62–66%)',
+    'most of them (86%) for groupmates still getting food',
     'had not seen an empty table to head for',
-    'Non-reservers who arrive at the same times walk away almost as often',
-    'Time in the queue falls by 1–3 seconds',
-    'about 200 such comparisons',
-    'The lunch the app plays on screen is a busy one',
+    'It depends on how full the hall looks.',
+    'no clear difference to leaving (−0.1 pp [−0.2, 0.0])',
+    'they are a selected set: they all got past the door',
+    'Time in the queue falls by 20–32 seconds',
+    'about 219 such comparisons',
+    'The lunch the app plays on screen has free-flow leaving of 18.2%',
   ]) expect(text, s).toContain(s);
-  expect(text).not.toContain('non-reservers pay most');
+  for (const old of ['walk away', 'walk-away', 'takeaway']) expect(text.toLowerCase(), old).not.toContain(old);
   const row100 = panel.locator('table.fhead tbody tr').nth(4);
-  await expect(row100.locator('td').nth(0)).toHaveText('7.7%: +5.1 pp [4.6, 5.5]');
-  await expect(row100.locator('td').nth(2)).toHaveText('64.6%: −6.0 pp [−6.6, −5.4]');
-  await expect(panel.getByRole('row', { name: /Reservers who found no table/ }).getByRole('cell').first()).toHaveText('10.2% vs 4.6%');
-  await expect(panel.getByRole('row', { name: /Quiet day/ }).getByRole('cell').nth(1)).toHaveText('+0.7 [0.3, 1.1]');
+  await expect(row100.locator('td').nth(0)).toHaveText('21.4%: +4.8 pp [4.4, 5.1]');
+  await expect(row100.locator('td').nth(2)).toHaveText('55.8%: −4.7 pp [−5.1, −4.3]');
+  await expect(panel.getByRole('row', { name: /Reservers who found no table/ }).getByRole('cell').first()).toHaveText('20.2% vs 27.2%');
+  await expect(panel.getByRole('row', { name: /Quiet day/ }).getByRole('cell').nth(1)).toHaveText('+0.6 [−0.1, 1.2]');
 });
 
 test('the slider or a new seed alone do not flag the findings as not applying', async ({ page }) => {
@@ -131,7 +132,7 @@ test('jumping from Findings to Assumptions opens it at the top with focus on its
 test('at 320 px the group-size labels do not overlap', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
   await page.goto('/#findings');
-  const boxes = await page.locator('.fchart').nth(3).locator('.flabel').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.left, r.right]));
-  expect(boxes).toHaveLength(4);
+  const boxes = await page.locator('.fchart').nth(4).locator('.flabel').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.left, r.right]));
+  expect(boxes).toHaveLength(6);
   for (let i = 1; i < boxes.length; i++) expect(boxes[i][0]).toBeGreaterThanOrEqual(boxes[i - 1][1]);
 });

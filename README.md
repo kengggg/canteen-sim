@@ -7,7 +7,12 @@ Two identical canteens run side by side on the **same crowd**: the same people a
 have the same tastes (only a longer queue can send someone to a different stall). In canteen **A** a share of groups
 reserve a whole table first. In canteen **B** nobody reserves. Everything else, every random draw included, is
 identical. Evidence comes from many paired lunches with 95% confidence intervals on four primary endpoints fixed in
-advance: walk-aways, time from entrance to seat (or giving up), peak seat utilization and peak throughput.
+advance: people who left without eating, time carrying a plate, peak seat utilization and peak throughput.
+
+**Model 2** (current): food comes on a plate and can't be taken away, so anyone holding food keeps looking until
+seated (a group that has circled for 2 minutes accepts a table that seats only some of it). People may leave before
+getting food: at the door, if the queues or the seating look too bad for the group's patience, or after queuing longer
+than that. Design and the frozen rules: [`docs/superpowers/specs/2026-09-26-model-v2-plates-design.md`](docs/superpowers/specs/2026-09-26-model-v2-plates-design.md).
 
 - **Live page (private claude.ai artifact):** https://claude.ai/artifact/7NBZqCJ7HxeGJ2LCNSnfNv
 - **Design spec:** [`docs/superpowers/specs/2026-09-24-canteen-sim-design.md`](docs/superpowers/specs/2026-09-24-canteen-sim-design.md)
@@ -25,10 +30,11 @@ Requires Node 22.
 npm install
 npm run dev            # development server
 npm test               # unit and rule tests (Vitest)
-npm run test:sanity    # model-sanity suite: 30-seed checks, 200 fast-check configs, evidence freshness (~3 min)
+npm run test:sanity    # model-sanity suite: 30-seed checks (every preset), 200 fast-check configs, evidence freshness (~4 min)
+npm run bcheck         # the model-2 B-only check: free flow alone at the defaults (≤ 20% leave, ≤ 10 min with a plate)
 npm run bench          # A (100%) and B at defaults; fails on > 10% event drift or a median over 3 s
 npm run precompute     # re-run the default reservation sweep (150 runs) into src/generated/evidence.json
-npm run findings       # Findings panel figures (instrumented sweep + 8 other settings) into src/generated/findings.json (~6 min)
+npm run findings       # Findings panel figures (instrumented sweep + 11 other settings) into src/generated/findings.json (~5 min)
 npm run golden:update  # Node reference hashes for the cross-browser self-test
 npm run build          # dist/index.html — one self-contained file
 npm run build:pages    # the same, checked self-contained (≤ 1.5 MB), plus dist/.nojekyll: what Pages deploys

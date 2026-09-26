@@ -1,7 +1,9 @@
 # Canteen Seat-Reservation Simulation — Design Spec
 
 - **Date:** 2026-09-24
-- **Status:** v3, revised after a four-lens review and a coverage/consistency check; awaiting owner review
+- **Status:** v4 (model 2). v3 was revised after a four-lens review and a coverage/consistency check; v4 folds in
+  [`2026-09-26-model-v2-plates-design.md`](2026-09-26-model-v2-plates-design.md), which stays the frozen record of the
+  model-2 rules, defaults and primary endpoints
 - **Repo:** `kengggg/canteen-sim` (private)
 - **Source sketch:** [`2026-09-24-layout-sketch.jpg`](2026-09-24-layout-sketch.jpg)
 
@@ -18,8 +20,12 @@
   - Both canteens get the **identical crowd**: the same people arriving at the same moments with the same appetites.
 - **Movement.** People walk an aisle network whose lane limits encode the owner's spacing rule. Vertical aisles let
   two people pass each other; horizontal aisles are single file.
+- **Plates stay; people leave before food (model 2).** Food comes on a plate, so nobody leaves holding food: a
+  searcher keeps looking until seated, and after 2 minutes a group accepts a table that seats only some of it. A
+  group leaves at the door if the queues or the seating look too bad for its patience, and a member who queues past
+  the group's limit gives up alone.
 - **Evidence.** Four primary metrics, fixed in advance, are compared over many paired lunches with confidence
-  intervals: walk-aways, time from entrance to seat, peak seat utilization and peak throughput.
+  intervals: left without eating, time carrying a plate, peak seat utilization and peak throughput.
 
 ---
 
@@ -40,7 +46,7 @@ The owner wants to show free flow is better. That claim only convinces a skeptic
 2. Free flow's real costs are modeled:
    - searching while carrying a tray;
    - asking strangers "is this seat free?";
-   - groups that cannot find seats together;
+   - groups that cannot find seats together (they split after circling);
    - a seated member holding seats for friends still queuing.
 3. Every numeric assumption is an adjustable setting (§9). Every structural assumption is listed in an in-app
    **Assumptions** panel (§11.12, §15). A **"Reservation-friendly"** preset gives reservation its best shot.
@@ -91,7 +97,7 @@ The owner wants to show free flow is better. That claim only convinces a skeptic
 - **Event times** are integer **milliseconds of sim time**. Time 0 is `crowd.windowStart`.
 - **Durations.**
   - Drawn durations (service and eating times) convert as `max(1, Math.round(seconds·1000))`.
-  - Duration settings (`search.patience`, `reserve.claimSearchLimit`, `eat.linger`, `tray.dropTime`,
+  - Duration settings (`search.splitAfter`, `leave.waitMean`, `reserve.claimSearchLimit`, `eat.linger`, `tray.dropTime`,
     `crowd.peakSpread`) convert as `Math.round(seconds·1000)`, so a 0 setting stays 0 ms.
   - In the UI-side formulas of §7.2 and §9.2, `serviceMean`, `eat.mean`, `eat.linger` and window lengths are in
     minutes (config seconds ÷ 60).
@@ -404,11 +410,11 @@ People move edge by edge. An agent does work only when an event fires (§12.2).
 
    Actions on lines with ≥ 2 lanes block nothing. Actions are finite, so busy nodes cannot deadlock.
 8. **Re-planning.**
-   - **On an edge.** A re-plan fires on a new target, a fallback, a walk-away, dispersal, or a new seat or stall. If it
+   - **On an edge.** A re-plan fires on a new target, a fallback, a queue leave, a split, dispersal, or a new seat or stall. If it
      fires while the agent is on an edge, it takes effect at that edge's far node: the agent finishes the edge and
      routes from there.
    - **In a queue area.** During a queue-area path, it takes effect at the walkway stop.
-   - **What happens at the event ms.** Stall choice (and its `queueLength` count), patience start, the walk-away count
+   - **What happens at the event ms.** Stall choice (and its `queueLength` count), the split clock, the leave count, held-seat release
      and the searcher role are all decided at the event ms. Only the route, and a new search's first observation,
      wait for the next node or walkway stop.
 
@@ -545,8 +551,9 @@ This applies to every group in B, and to non-reservers and fallback groups in A.
    - Members walk to their own seat's access node once they have food, and sit.
    - People respect held seats.
 5. **Sharing.** Other seats at that table stay available to strangers.
-6. **Patience.** If the searcher has not committed within `search.patience` of receiving food, the whole group walks
-   away (§5.7).
+6. **No takeaway; splitting (model 2).** Food comes on a plate: the searcher keeps searching until it commits. After
+   `search.splitAfter` of circling the party accepts a table that seats only some of it; the rest keep looking
+   (§5.7).
 
 ### 5.4 Reserving group
 
@@ -603,8 +610,10 @@ This applies to groups in canteen A whose reserver draw is below the reserve fra
    - The claimer chooses a stall at the fallback ms. If it is on an edge, it finishes that edge first (§4.2 rule 8).
    - The searcher is the first member with food. If a member already holds food, it becomes the searcher at the
      fallback ms.
-   - Patience counts from the later of its service end and the fallback ms.
-10. **No walk-away after a claim.** A reserving group that has claimed never walks away.
+   - The split clock (§5.7) counts from the later of its service end and the fallback ms.
+10. **Leaving after a claim (model 2).** Members of a reserving group can give up in a queue like anyone else (§5.7).
+    The table stays claimed while any member remains; when the last one gives up, it walks back to the claim node,
+    picks up the object (3,000 ms) and the table becomes ordinary at the pick-up end.
 
 **Claim mode `together` (setting)**
 
@@ -723,28 +732,38 @@ ask on the true state:
 - Setting `reserve.shareMinEmpty = 2k` disables sharing (the strict rule). A complete group has at least one member
   seated, so at most `2k − 1` seats can be empty.
 
-### 5.7 Walking away
+### 5.7 Leaving before food, and splitting (model 2)
 
-**When**
+The normative rules are
+[`2026-09-26-model-v2-plates-design.md`](2026-09-26-model-v2-plates-design.md) §2; in short:
 
-- Patience applies **only to free-flow searchers**, and only while they walk, explore, wait at a node or choose a
-  target.
-- A reserving group that has claimed never walks away.
-- A party that has committed never walks away, and its held seats stay held until each member sits.
-- **At the patience timer:**
-  - mid-ask: the party walks away at the ask's end unless that ask ends in a commit. Every non-commit outcome counts,
-    including a failed rule-1 test at a table that became unclaimed. With `search.parallel`, the decision waits for
-    every pending ask: the party commits if any of them commits, and otherwise walks away at the last one's end;
-  - committed or sitting: nothing happens;
-  - otherwise: the group walks away at that ms.
+**Each group's patience** (stream `leave`, §8.2)
 
-**What happens at the decision**
+- Wait limit `L_g`: lognormal with mean `leave.waitMean` and CV `leave.waitCV` (§8.4), drawn from
+  `u(leave, groupId)`, the same in A and B.
+- Room needed `R_g = 0` if `leave.roomNeeded = 0`, else `max(1, Math.round(roomNeeded · waitMeanMs / L_g))`.
 
-- Members holding food go straight to the tray return. Their food is packed as takeaway there, which counts as a
-  tray drop: they join the same FIFO and hold a slot for `tray.dropTime`, then walk to the exit at `move.walkSpeed`.
-- Members without food keep buying: walking to a stall, waiting for a queue, queuing or being served. Each goes
-  straight to the tray return at its service end.
-- Every member counts as a **walk-away** from the decision ms.
+**At the door** (in the arrival event, before any choice or claim)
+
+- The group leaves if even the shortest queue, `min_s queueLength_s × serviceMeanMs`, is longer than `L_g`, or if
+  fewer than `R_g` tables look like a fit: no object, and at least `n` seats with nobody sitting (held seats look
+  empty). Every member counts as *left without eating* and walks from the entrance to the exit.
+
+**While queuing**
+
+- From its first walkway-stop arrival, a person who has queued longer than `L_g` without being served leaves alone:
+  at once from a slot or a walkway stop, or at the end of a walk-in or move-up (reaching position 1 cancels it).
+  People behind move up; a seat held for the leaver is released; the rest carry on as a smaller party.
+- The last member of a group with a claimed table collects the object (§5.4 point 10).
+
+**No takeaway, and splitting**
+
+- Nobody leaves holding food. The split clock starts at the searcher's service end (the later of that and the
+  fallback ms after a fallback; the first member's food with `search.parallel`). At `start + search.splitAfter` an
+  uncommitted party enters split mode: an unclaimed table needs `min(n, 2)` free seats, a claimed one takes
+  `min(n, shareMaxParty)` joiners under §5.6, and the target maximises room, then distance.
+- At a partial commit of `m < n` seats the searcher, then members holding food (by service end), then members
+  without food sit; the others become a new party already in split mode. A claimed group never splits.
 
 ### 5.8 Eating and leaving
 
@@ -769,7 +788,7 @@ ask on the true state:
 | **Stand** | Seats are `occupied` until `T_stand + 3,000` ms, then released. The object is removed at the same ms (claiming group only). |
 | **Claim** | The table is claimed at the claimer's arrival ms, if completely empty. The object is placed 3,000 ms later, and then the claimer leaves. |
 | **Ask** | 5,000 ms, decided at its end against the true state. |
-| **Walk-away** | At the decision ms (§5.7). |
+| **Leaving** | At the door: the arrival ms. From a queue: the queue-leave ms, or the end of the walk-in or move-up it falls in (§5.7). |
 
 ### 5.10 Optional behaviors (identical in A and B; off by default)
 
@@ -780,7 +799,7 @@ ask on the true state:
 - Each targets the nearest suitable table not targeted by a groupmate. If every suitable table is taken by a
   groupmate, it targets the nearest one anyway; ties go to the lower table id.
 - The first searcher to commit holds seats for all. The others stop searching and walk to their seats.
-- Patience counts from the first member's food.
+- The split clock (§5.7) counts from the first member's food.
 
 **`search.emptyTableDetour = d` (metres)**
 
@@ -833,22 +852,24 @@ UI states how many intervals it shows.
 
 | # | Endpoint | Definition | Better |
 |---|---|---|---|
-| P1 | **Walk-away %** | Walk-away people ÷ actual arrivals × 100. | lower |
-| P2 | **Mean entrance-to-seat-or-give-up** | Over **every arrival**: (sit-start ms, or the group's walk-away decision ms) − entrance ms, in minutes. | lower |
+| P1 | **Left without eating %** | People who left at the door or from a queue ÷ actual arrivals × 100 (model 2). | lower |
+| P2 | **Time carrying a plate** | Mean, over every person with a service end, of (sit start − service end), in minutes (model 2). | lower |
 | P3 | **Peak seat utilization** | `occupied` seat-seconds ÷ (seats × window length in s) over the pair's peak window (§7.7). It is a *PairMetric*. | higher |
 | P4 | **Peak throughput** | The maximum number of sit starts in any 60-minute window `[t, t + 3,600,000)`. It is shown next to the stall ceiling `60·S / serviceMean` people per hour (1,200/h at defaults). | higher |
 
-**Seated diners** = people with a sit start. At done it equals arrivals − walk-aways (invariant, §13.3). It is shown
-beside P1 as a count only: it is exactly P1's complement, so it gets no interval and no win count of its own.
+**Seated diners** = people with a sit start. At done it equals arrivals − left without eating (invariant, §13.3). It
+is shown beside P1 as a count only: it is exactly P1's complement, so it gets no interval and no win count of its own.
 
 ### 7.3 Secondary metrics
 
 | Metric | Definition | Better |
 |---|---|---|
-| Entrance-to-seat-or-give-up, median and p90 | as P2 | lower |
-| **Food-to-seat-or-give-up** (mean, median, p90) | (sit start or walk-away decision) − service end, over people whose service ended at or before that outcome. | lower |
+| Time carrying a plate, median and p90 | as P2 | lower |
+| **Entrance to seat, seated diners** (mean, median, p90) | sit start − entrance, over people who sat. | lower |
+| **Most people holding food without a seat at once** | peak of the count of people with food and no committed or assigned seat | lower |
+| **Groups that split** | % of groups with a member served that made a split commit | lower |
 | **Seats blocked while needed** | `Σ` over *demand ms* of seats in {held, claimedEmpty, blockedLeftover} ÷ `Σ` over demand ms of all seats. A demand ms is one with ≥ 1 stuck free-flow searcher in that canteen (§5.5). Demand minutes are shown next to it. With no demand, the value is 0. `openToSmall` during demand is shown on a separate line, not in the numerator. | lower |
-| **Seat search time (with food)** | Per group: searcher's service end → commit or walk-away decision. It is 0 for groups that sat at their claimed table. Mean and p90 over all groups. | lower |
+| **Seat search time (with food)** | Per group: first searcher's service end → the commit that seats its last member. It is 0 for groups that sat at their claimed table. Mean and p90 over all groups. | lower |
 | Queue wait | Queue join → service start; mean and p90. | lower |
 | Seat utilization, whole | `occupied` seat-seconds inside `[0, T + 60 min]` ÷ (seats × (T + 60 min) in s). Occupancy after `T + 60 min` is not counted. | higher |
 
@@ -860,15 +881,9 @@ beside P1 as a count only: it is exactly P1's complement, so it gets no interval
 - Turned-away asks, split into *at claimed tables* and *by held/occupied seats*.
 - Fallback reservers.
 - Claim search time: per reserving group, entry → claim or fallback.
-- **Split-feasible walk-aways:** walk-away groups for which the canteen had ≥ `n` seats in state `free` across all
-  tables at the decision ms.
-  - Reported per canteen as a count and a % of walk-away groups and of walk-away people, overall and per group size
-    1–6.
-  - CSV columns: `splitFeasibleGroups`, `splitFeasiblePeople`, and `splitFeasibleGroups_s{n}` /
-    `splitFeasiblePeople_s{n}` for n = 1…6.
+- **Left at the door** (count, % of arrivals) by reason: *queues*, *seating*, *both*; **left from a queue** (count,
+  %); **objects collected** by a returning member (A only).
 - Standing-with-food person-minutes: people holding food who are waiting, not walking.
-- `walkAwayServedAfterDecision`: the number, and % of walk-away people, whose service ended after their group's
-  walk-away decision ms.
 - Total visit of seated diners (mean, median, p90).
 - Stuck minutes.
 - Events per kind.
@@ -877,16 +892,16 @@ beside P1 as a count only: it is exactly P1's complement, so it gets no interval
 ### 7.5 Breakdowns
 
 - **By group size (1–6):**
-  - walk-away %;
-  - mean entrance-to-seat-or-give-up;
-  - mean food-to-seat-or-give-up;
+  - left without eating %;
+  - mean entrance to seat (seated diners);
+  - mean time carrying a plate;
   - group and person counts.
 - **By reserver cohort** (R12; a *PairMetric*). For the level being compared:
   - Cohort R = groups with `r_g < fraction`; cohort N = the rest.
   - In B the same group ids form R ("would-be reservers").
   - Within A, R splits into *claimed* and *fallback*, each against the same groups in B.
-  - Per cohort, A and B, report walk-away %, and the mean, median and p90 of entrance-to-seat-or-give-up, plus mean
-    food-to-seat-or-give-up.
+  - Per cohort, A and B, report left without eating %, the mean, median and p90 of entrance to seat (seated diners),
+    and mean time carrying a plate.
   - Paired free-flow advantage per cohort, with CI. Every cohort metric is lower-is-better, so this is `A − B`.
   - Empty cohorts show `—`.
   - CSV prefixes: `cohortR_`, `cohortN_`, `cohortRclaimed_`, `cohortRfallback_`.
@@ -902,17 +917,17 @@ beside P1 as a count only: it is exactly P1's complement, so it gets no interval
 - Searching with food now
 - Claiming a table now (A only)
 - Standing with food now
-- Walk-aways so far
+- Left without eating so far (door and queue counts)
 - Sit starts in the last 60 min
-- Mean entrance-to-seat-or-give-up so far
+- Mean entrance to seat so far (seated diners)
 
 **Difference strip**
 
 - It shows the *free-flow advantage* (§10.3) for P1–P4.
 - It shows `—` until both canteens have a value, and updates once per sim minute.
 - **Provisional values before done**, from `engine.live()`:
-  - P1 = walk-aways so far ÷ arrivals so far × 100;
-  - P2 = the mean over arrivals so far of (outcome ms, or *now* if no outcome yet) − entrance ms;
+  - P1 = left without eating so far ÷ arrivals so far × 100;
+  - P2 = the mean, over people served by now, of (sit start, or *now*) − service end;
   - P4 = the maximum sit starts in any 60-min window ending at or before now;
   - P3 shows `—` until both runs are done.
 
@@ -980,6 +995,7 @@ Unused `b = 0`.
 | 9 | `stallRank` | stallId | popularity ranking |
 | 10 | `route` | personId, currentNode·N + targetNode | next-hop tie-break |
 | 11 | `batchSeed` | i | batch seeds (§10.1) |
+| 12 | `leave` | groupId | wait-limit percentile (§5.7, model 2) |
 
 ### 8.3 Identity and nested crowds
 
@@ -1045,7 +1061,8 @@ reshuffles unrelated draws.
    - stand end (seat release and object removal);
    - place end;
    - ask end (with its decision);
-   - tray-drop end (the next queued drop starts in the same event).
+   - tray-drop end (the next queued drop starts in the same event);
+   - pick-up end (the table becomes unclaimed, model 2).
 2. **Service completions**, keyed by the served personId.
 3. **Edge exits and node arrivals.** This covers observation and every on-arrival decision:
    - table check, commit and claim;
@@ -1053,11 +1070,12 @@ reshuffles unrelated draws.
    - arrival at a stall walkway stop (position assignment);
    - tray-queue join or drop start;
    - exit removal.
-4. **Queue events**, keyed by stallId: move-ups, walk-in arrivals at slots (queue join) and service starts.
-5. **Group arrivals** at the entrance.
+4. **Queue events**, keyed by stallId: move-ups, walk-in arrivals at slots (queue join), service starts, and a queue
+   leave deferred to the end of a walk-in or move-up (a service start at position 1 cancels it).
+5. **Group arrivals** at the entrance, starting with the door check (§5.7).
 6. **Edge admissions.** Every edge entry happens here (§4.2 rule 1).
 7. **Timers:**
-   - patience;
+   - queue leave (keyed by personId) and split (keyed by the party's lowest personId);
    - claim cutoff;
    - the 5 s re-choose;
    - eat end;
@@ -1364,7 +1382,7 @@ Help text for Reservation-friendly:
 - **Build step.** `npm run precompute` runs the default reservation sweep (150 runs) in Node. It embeds each run's
   RunMetrics and run hash, plus each pair's PairMetrics (≈ 60 KB JSON), in `index.html`.
 - **Evidence line.** When the applied config equals the defaults (canonical settings code), the top bar shows an
-  **Evidence (30 lunches)** line with the P1 sentence at 100% vs 0%.
+  **Evidence (30 lunches)** line with the P1 (left without eating) sentence at 100% vs 0%.
 - **Evidence panel.** The line opens the batch view pre-filled and labelled *"Precomputed for the default settings,
   model {MODEL_VERSION}. Re-run on this device to check."* It leads with P1–P4 at 100% vs 0%, then the 50% level (the
   live default).
@@ -1375,15 +1393,16 @@ Help text for Reservation-friendly:
 ### 10.9 Findings data (shipped with the page)
 
 - **What it holds.** Figures behind the Findings panel (§11.13) that the evidence cannot provide, all for the default
-  settings: completely empty tables per minute; reserving groups by arrival time (claimed or fell back); a finer split
-  of busiest-hour reserved seats; walk-away groups classified at the moment they gave up; where the extra entrance-to-seat
-  time goes; and 100% vs 0% on the primary endpoints under eight other settings. Types: `src/batch/findings-data.ts`.
+  settings: completely empty tables per minute; people holding food with no seat per minute; reserving groups by
+  arrival time (claimed or fell back); a finer split of busiest-hour reserved seats; who left without eating, where
+  and why, by arrival time; where the entrance-to-seat time goes; and 100% vs 0% on the primary endpoints under eleven
+  other settings (model 2). Types: `src/batch/findings-data.ts`.
 - **Build step.** `npm run findings` computes them from fresh Node runs of the default sweep (plus 60 runs per extra
   setting) and writes `src/generated/findings.json` (≈ 20 KB). Instrumentation only reads engine state (the `trace`
   callback, per-person timestamps, table masks, the seat clock); run hashes must stay identical.
 - **Freshness.** The file records `MODEL_VERSION` and a digest of the evidence run keys and hashes. A test fails when
   either differs, so a model change that regenerates the evidence also forces the findings to be regenerated. Tests
-  also cross-check every figure the two files share (claims, walk-away groups, seat shares, time totals, the default
+  also cross-check every figure the two files share (claims, leavers, seat shares, the baseline trip, the default
   robustness row).
 - **Everything else is live.** Figures the evidence can provide (headline table, cohorts, group sizes, seat states,
   lunch-to-lunch spread) are computed from the evidence in the page, never copied into text.
@@ -1533,11 +1552,9 @@ Dismissal is remembered in `localStorage`, inside try/catch. Without storage, th
   | Searching with food | free-flow searcher |
   | Holding seats | seated, while own party still has members not sitting (both canteens) |
   | Eating | any other seated person, including those waiting for groupmates to finish and those lingering |
-  | Walked away | walk-away members holding food, from the decision until they exit; they fade out |
+  | Left without eating | door and queue leavers from the leave ms until they exit, including a member collecting an object; they fade out (model 2) |
   | Walking | everyone else: entering and walking to a stall, R6 waiters and others carrying food who are not searching (tray cue), walking with food to a seat, going to the tray return or the exit |
 
-- A walk-away member without food at the decision stays in its buying class until service end, then turns
-  *walked away*.
 - The **tray** is a second, non-colour cue.
 - A **colour by group** toggle is available.
 - The 7 person classes and the 6 seat-state colours are chosen with the dataviz method and pass a colour-vision-deficiency
@@ -1823,7 +1840,7 @@ Development is test-driven: every rule gets a failing test first.
 - Claim cutoff:
   - a target chosen before the cutoff is still claimed;
   - with limit 0, only tables visible at entry can be claimed;
-  - fallback resets memory and uses the patience start rule.
+  - fallback resets memory and starts the split clock at the later of food and fallback.
 - Claim modes: `oneClaimer` members queue on entry; `together` convoy members walk the leader's node sequence under
   lane rules.
 - Reserver seat assignment: members already holding food at the claim ms are assigned at that ms, in (service-end ms,
@@ -1832,7 +1849,8 @@ Development is test-driven: every rule gets a failing test first.
 
 **Free flow**
 
-- A party needs `n` seats at one table.
+- A party needs `n` seats at one table until it has circled for `search.splitAfter`; then a partial commit seats the
+  searcher, food holders and the rest in that order, and the others form a party in split mode.
 - The first member with food searches. Same-ms ties go to the lowest id.
 - All `n` seats are held from commit.
 - Asking at an occupied unclaimed table; refusal when the seats are held; the refusal lasts 180 s.
@@ -1843,11 +1861,14 @@ Development is test-driven: every rule gets a failing test first.
 - Joiners next to claimers at N0, N1 take S1, S2.
 - Reservers fill the claimer's side first.
 
-**Walk-aways and leaving**
+**Leaving (model 2)**
 
-- Patience expiry makes the whole group walk away. Members without food finish buying, then return trays.
-- A pending ask decides the outcome before a walk-away. A committed party never walks away.
-- Groups stand up together. Everyone passes the tray return before exiting.
+- The door verdict at its exact boundaries; door leavers never queue and walk straight out.
+- A queue leaver leaves at `queueStart + L_g` (or at the end of that step), unserved, with no tray and no seat; the
+  people behind move up; reaching service cancels a deferred leave.
+- Nobody leaves holding food; every served person sits.
+- The last member of a claimed group collects the object; the table stays claimed until the pick-up ends.
+- Parties stand up together. Everyone who ate passes the tray return before exiting.
 
 **Movement**
 
@@ -1896,7 +1917,10 @@ Development is test-driven: every rule gets a failing test first.
 - `arrived = inside + exited`.
 - Lane capacity, link-direction and busy-node rules hold.
 - Nobody sits at a claimed table except its group or valid joiners.
-- At done, `arrivals = seated diners + walk-aways`, where seated diners are people with a sit start.
+- At done, `arrivals = seated diners + left without eating`, where seated diners are people with a sit start.
+- Nobody exits holding food; at done every person with a service end has a sit start.
+- No seat is held for a person who has left; a claimed table's group has a remaining member, or its last member is
+  collecting the object; no two idle people share a queue position; the door check's fit counts equal a full scan.
 - `truncated = false` for generated configs with `ρ̄ ≤ 0.8`.
 
 **Bounds**
@@ -1907,15 +1931,16 @@ Development is test-driven: every rule gets a failing test first.
 
 ### 13.4 Model sanity
 
-- **Default termination.** At defaults, seeds 1–30, A at 100% and B: every run ends with `truncated = false` and
-  exited = arrivals.
-- **Small crowd.** `totalPeople = 100`, seeds 1–30, A at 100% and B: 0 walk-aways, and *seats blocked while needed*
-  ≤ 1%, in every run.
-- **Maximum patience.** `totalPeople = 100`, `search.patience = 30 min`, seeds 1–30, A at 100% and B: 0 walk-aways in
-  every run.
+- **Termination.** At the defaults **and in every preset**, seeds 1–30, A at 100% and B: every run ends with
+  `truncated = false` and exited = arrivals.
+- **Small crowd.** `totalPeople = 100`, `leave.waitCV = 0`, seeds 1–30, A at 100% and B: nobody leaves without eating,
+  and *seats blocked while needed* ≤ 1%, in every run.
+- **No leaving.** At the defaults with `leave = {waitMean: 60 min, waitCV: 0, roomNeeded: 0}`, seeds 1–30, A at 100%
+  and B: nobody leaves without eating.
+- **Wait limit.** `leave.waitMean` 5 vs 15 min, B only, seeds 1–30: more people leave at 5 min in ≥ 25 of 30 seeds.
 - **Crowd size.**
   - `totalPeople ∈ {400, 1000, 1800, 2600}` (nested), seeds 1–30, A at 100% and B separately.
-  - For each consecutive pair, the mean over seeds of the paired difference in walk-away **count** (larger crowd −
+  - For each consecutive pair, the mean over seeds of the paired difference in left-without-eating **count** (larger crowd −
     smaller crowd) is ≥ −2·SE, where SE = sd(paired differences)/√30.
   - Per-seed monotonicity is never asserted.
 - **Queue aversion.** `queueAversion` 0 vs 5, B only, seeds 1–30: the stall HHI `Σ(served_s/served)²` is higher at 0
@@ -1929,7 +1954,8 @@ Development is test-driven: every rule gets a failing test first.
   over 10⁶ customers is within 5% of `λm²(1+c²)/(2(1−λm))`.
 - **Mechanism test (Reservation-friendly preset, 30 seeds).** People in groups that claimed a table in A have a lower
   median food-to-seat time than the same people in B, and the paired 95% CI excludes 0. **No test asserts which
-  canteen wins any headline metric.**
+  canteen wins any headline metric.** In model 2 the median still rises (A − B ≈ +6.3 s, 95% CI 5.7 to 6.9) and the
+  mean still falls (A − B ≈ −8.9 s, CI −12.1 to −5.7).
   - *Implementation finding (Plan 2), awaiting the owner's decision:* this expectation **does not hold** in the model.
     The median rises (A − B ≈ +6 s): claims succeed mostly early, at empty tables visible from the entrance, which lie
     farther from the stalls than the tables the same groups find in B off-peak. The mean falls (A − B ≈ −7.5 s, 95% CI
@@ -2121,6 +2147,22 @@ This ledger is also shown in-app (§11.12).
 | 16 | Default claim mode: **one claimer** (`together` stays available as a setting) |
 | 17 | Live-view default `reserve.percentA` = **50%** |
 | 18 | Primary endpoints P1–P4 at 100% vs 0%, 95% uncorrected; everything else secondary |
+
+**Model 2 (2026-09-26)** — details and the author's refinements V1–V9 in
+[`2026-09-26-model-v2-plates-design.md`](2026-09-26-model-v2-plates-design.md) §9.
+
+| # | Decision |
+|---|---|
+| 19 | Food is served on plates that can't leave the canteen: no takeaway. Anyone holding food searches until seated. This replaces the walk-away rule of decision #12; the 10 m visibility stays. |
+| 20 | Groups may leave before food: at the door, after looking at the queues and the seating, and while queuing. |
+| 21 | Each group has its own wait limit, averaging 10 minutes and varying between groups. |
+| 22 | A member who waits past the limit leaves alone, and the rest carry on. |
+| 23 | Reservers follow the same rules. The last one to leave collects the object. |
+| 24 | At the door the whole hall is judged at a glance. An object makes a table look taken. |
+| 25 | After circling for 2 minutes, a group seats whoever fits and the rest keep looking. This amends decision #3. |
+| 26 | The old rule is replaced (model version 2), with no takeaway setting. |
+| 27 | New primary endpoints P1–P4 (§7.2), fixed before any A-vs-B run. This amends decision #18. |
+| 28 | A B-only check runs before any A-vs-B run. |
 
 ### 16.2 Refinements by the spec author (for owner review)
 
