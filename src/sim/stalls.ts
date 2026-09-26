@@ -8,10 +8,17 @@ import { STREAM, uniform } from './rng';
 export const Q_WALKIN = 1;
 export const Q_MOVEUP = 2;
 
+/** requestLeave results (design §2.3). */
+export const LEAVE_NOW = 0;
+export const LEAVE_DEFERRED = 1;
+export const LEAVE_SERVED = 2;
+
 export interface StallHost {
   scheduleQueue(ms: number, stall: number, type: number, p: number): void;
   scheduleServiceEnd(p: number, ms: number): void;
   onServiceStart(p: number): void;
+  /** A deferred leave took effect at the end of a walk-in or move-up. */
+  onDeferredLeave(p: number): void;
 }
 
 const ceilDiv = (a: number, b: number) => Math.floor((a + b - 1) / b);
@@ -21,6 +28,7 @@ const IDLE = 0;
 const WALKING_IN = 1;
 const MOVING_UP = 2;
 const SERVED = 3;
+const LEFT = 4;
 
 /** Stalls, queues and service (spec §5.2). */
 export class Stalls {
@@ -37,6 +45,9 @@ export class Stalls {
   readonly joinMs: Float64Array;
   readonly serviceStartMs: Float64Array;
   readonly serviceEndMs: Float64Array;
+  /** When the person left the queue without being served; −1 otherwise. */
+  readonly leaveMs: Float64Array;
+  readonly leavePending: Uint8Array;
   /** Queue-area path per person: 3 points (x, y in mm) and their times. */
   readonly px: Int32Array;
   readonly py: Int32Array;
@@ -79,6 +90,8 @@ export class Stalls {
     this.joinMs = new Float64Array(P).fill(-1);
     this.serviceStartMs = new Float64Array(P).fill(-1);
     this.serviceEndMs = new Float64Array(P).fill(-1);
+    this.leaveMs = new Float64Array(P).fill(-1);
+    this.leavePending = new Uint8Array(P);
     this.px = new Int32Array(3 * P);
     this.py = new Int32Array(3 * P);
     this.pt = new Float64Array(3 * P);
@@ -179,11 +192,68 @@ export class Stalls {
     this.settle(p, s);
   }
 
-  /** After a walk-in or move-up ends: start service, or the next move-up. */
+  /**
+   * p's wait limit has passed (design §2.3): standing idle in a slot it leaves now; walking in or moving up it leaves
+   * at that leg's end (unless the leg brings it to service); once service has started nothing changes.
+   */
+  requestLeave(p: number): number {
+    const st = this.state[p];
+    if (st === SERVED || this.serviceStartMs[p] >= 0) return LEAVE_SERVED;
+    if (st === WALKING_IN || st === MOVING_UP) {
+      this.leavePending[p] = 1;
+      return LEAVE_DEFERRED;
+    }
+    this.removeFromQueue(p);
+    return LEAVE_NOW;
+  }
+
+  private removeFromQueue(p: number): void {
+    const s = this.chosen[p];
+    this.integrate(s);
+    if (this.joinMs[p] >= 0) {
+      this.waitingCount[s]--;
+      this.inSlotCount[s]--;
+    }
+    const m = this.members[s];
+    const i = m.indexOf(p);
+    m.splice(i, 1);
+    this.queueLength[s]--;
+    this.leaveMs[p] = this.now;
+    this.leavePending[p] = 0;
+    this.state[p] = LEFT;
+    for (let k = i; k < m.length; k++) {
+      const q = m[k];
+      if (this.state[q] === IDLE && this.physPos[q] > k + 1) this.startMoveUp(q, s);
+    }
+  }
+
+  /** p chose a stall but never reached it: stop counting it there. */
+  releaseChoice(p: number): void {
+    const s = this.chosen[p];
+    if (s < 0) return;
+    this.queueLength[s]--;
+    this.chosen[p] = -1;
+  }
+
+  /** A leaver walks from its slot back to the walkway stop at walking speed; returns the arrival ms. */
+  walkBack(p: number): number {
+    const s = this.chosen[p];
+    const slot = this.pc.L.stalls[s].slots[this.physPos[p] - 1];
+    const top = this.pc.L.stalls[s].band === 'top';
+    const cx = top ? this.stopX[s] : slot.x;
+    const cy = top ? slot.y : this.stopY[s];
+    const t1 = this.now + legMs(Math.abs(slot.x - cx) + Math.abs(slot.y - cy), this.walk);
+    const t2 = t1 + legMs(Math.abs(this.stopX[s] - cx) + Math.abs(this.stopY[s] - cy), this.walk);
+    this.setPath(p, slot.x, slot.y, cx, cy, this.stopX[s], this.stopY[s], this.now, t1, t2);
+    return t2;
+  }
+
+  /** After a walk-in or move-up ends: start service, a deferred leave, or the next move-up. */
   private settle(p: number, s: number): void {
     const logical = this.members[s].indexOf(p) + 1;
     const slot = this.pc.L.stalls[s].slots[this.physPos[p] - 1];
     if (this.physPos[p] === 1 && logical === 1) {
+      this.leavePending[p] = 0;
       this.integrate(s);
       this.waitingCount[s]--;
       this.state[p] = SERVED;
@@ -191,6 +261,9 @@ export class Stalls {
       this.setPath(p, slot.x, slot.y, slot.x, slot.y, slot.x, slot.y, this.now, this.now, this.now);
       this.host.onServiceStart(p);
       this.host.scheduleServiceEnd(p, this.now + this.pop.serviceMs[p]);
+    } else if (this.leavePending[p]) {
+      this.removeFromQueue(p);
+      this.host.onDeferredLeave(p);
     } else if (this.physPos[p] > logical) {
       this.startMoveUp(p, s);
     } else {

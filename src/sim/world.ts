@@ -239,6 +239,7 @@ export class World {
       scheduleQueue: (ms, stall, type, p) => this.q.push(ms, K.QUEUE, stall, EV.QUEUE, p, type),
       scheduleServiceEnd: (p, ms) => this.q.push(ms, K.SERVICE, this.pop.personId[p], EV.SERVICE_END, p, 0),
       onServiceStart: (p) => this.setPhase(p, PH.SERVING),
+      onDeferredLeave: (p) => this.onDeferredLeave(this, p),
     });
     const seats = this.pc.L.seats.length;
     this.clock = new SeatClock(seats, this.simEnd);
@@ -435,6 +436,9 @@ export class World {
     if (this.mv.edge[p] >= 0) return;
     if (this.mv.node[p] >= 0) this.onTrip(p);
   }
+
+  /** Behaviour hook set by the agents module: a queue leave deferred to the end of a walk-in or move-up took effect. */
+  onDeferredLeave: (w: World, p: number) => void = () => {};
 
   /** Behaviour hook set by the agents module: called when p reaches its trip target. */
   onReach: (w: World, p: number) => void = () => {};
