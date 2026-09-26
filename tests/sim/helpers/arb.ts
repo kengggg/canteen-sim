@@ -35,6 +35,10 @@ export const smallConfigArb: fc.Arbitrary<{ cfg: Config; fraction: number }> = f
     tray: step(0.3, 2, 0.05),
     vis: fc.integer({ min: 2, max: 100 }),
     patience: step(0.5, 30, 0.5),
+    splitAfter: fc.integer({ min: 0, max: 60 }).map((x) => x * 30),
+    waitMean: fc.integer({ min: 1, max: 120 }).map((x) => x * 30),
+    waitCV: step(0, 1.5, 0.05),
+    room: fc.integer({ min: 0, max: 20 }),
     parallel: fc.boolean(),
     detour: fc.integer({ min: 0, max: 40 }),
     drop: fc.integer({ min: 1, max: 60 }),
@@ -55,7 +59,8 @@ export const smallConfigArb: fc.Arbitrary<{ cfg: Config; fraction: number }> = f
     c.stalls = { serviceMean: r.service * 60, serviceCV: r.scv, popularitySkew: r.skew, queueAversion: r.aversion };
     c.eat = { mean: r.eat * 60, cv: r.ecv, linger: r.linger * 60 };
     c.move = { walkSpeed: r.walk, traySpeed: r.tray };
-    c.search = { visibility: r.vis, patience: r.patience * 60, parallel: r.parallel, emptyTableDetour: r.detour };
+    c.search = { visibility: r.vis, patience: r.patience * 60, splitAfter: r.splitAfter, parallel: r.parallel, emptyTableDetour: r.detour };
+    c.leave = { waitMean: r.waitMean, waitCV: r.waitCV, roomNeeded: r.room };
     c.tray = { dropTime: r.drop, slots: r.slots };
     return { cfg: c, fraction: r.fraction };
   });

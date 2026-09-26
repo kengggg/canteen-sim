@@ -1,7 +1,7 @@
 /** Stream ids (spec §8.2). */
 export const STREAM = {
   arrival: 1, size: 2, accept: 3, reserve: 4, object: 5, service: 6,
-  eat: 7, stallNoise: 8, stallRank: 9, route: 10, batchSeed: 11,
+  eat: 7, stallNoise: 8, stallRank: 9, route: 10, batchSeed: 11, leave: 12,
 } as const;
 
 /** murmur3 32-bit finaliser; returns a uint32. */

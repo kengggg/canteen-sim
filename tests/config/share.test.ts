@@ -32,6 +32,22 @@ test('non-default values, mix and times round-trip through the hash and the sett
   }
 });
 
+test('model 2 settings: metadata ranges, and non-default values round-trip', () => {
+  const byId = new Map(META.map((m) => [m.id, m]));
+  expect(byId.get('leave.waitMean')).toMatchObject({ group: 'Leaving', unit: 's', min: 30, max: 3600, step: 30 });
+  expect(byId.get('leave.waitCV')).toMatchObject({ group: 'Leaving', min: 0, max: 1.5, step: 0.05 });
+  expect(byId.get('leave.roomNeeded')).toMatchObject({ group: 'Leaving', type: 'int', min: 0, max: 20, step: 1 });
+  expect(byId.get('search.splitAfter')).toMatchObject({ group: 'Movement & search', unit: 's', min: 0, max: 1800, step: 30 });
+  const c = defaultConfig();
+  c.leave = { waitMean: 900, waitCV: 0.25, roomNeeded: 0 };
+  c.search.splitAfter = 300;
+  expect(encodeQuery(c)).toContain('leave.waitMean=900');
+  expect(encodeQuery(c)).toContain('search.splitAfter=300');
+  const d = parseShared(settingsCode(c));
+  expect(d.ok).toBe(true);
+  if (d.ok) expect(applyValues(d.values, d.model).cfg).toEqual(c);
+});
+
 test('random in-range configs round-trip', () => {
   fc.assert(fc.property(fc.array(fc.integer({ min: 0, max: 1000 }), { minLength: META.length, maxLength: META.length }), (r) => {
     const c = defaultConfig();

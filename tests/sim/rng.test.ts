@@ -11,8 +11,8 @@ test('hash4 known values (pins the formula)', () => {
   expect(uniform(1, 1, 0)).toBe(0.3788103809347376);
 });
 
-test('stream ids match spec §8.2', () => {
-  expect(STREAM).toEqual({ arrival: 1, size: 2, accept: 3, reserve: 4, object: 5, service: 6, eat: 7, stallNoise: 8, stallRank: 9, route: 10, batchSeed: 11 });
+test('stream ids match spec §8.2 (plus design §2.1 leave = 12)', () => {
+  expect(STREAM).toEqual({ arrival: 1, size: 2, accept: 3, reserve: 4, object: 5, service: 6, eat: 7, stallNoise: 8, stallRank: 9, route: 10, batchSeed: 11, leave: 12 });
 });
 
 test('uniform stays strictly inside (0,1) at extreme seeds and keys', () => {

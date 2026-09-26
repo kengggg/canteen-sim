@@ -10,7 +10,7 @@ import { num } from './format';
 import { MSG } from './labels';
 import { copyText, dirty, editPending, focusSetting, note, pending, restart, storage, validation } from './store';
 
-const GROUPS = ['Crowd', 'Reservation', 'Stalls', 'Eating', 'Movement & search', 'Tray return', 'Layout'] as const;
+const GROUPS = ['Crowd', 'Reservation', 'Stalls', 'Eating', 'Leaving', 'Movement & search', 'Tray return', 'Layout'] as const;
 const pad2 = (n: number) => (n < 10 ? '0' : '') + n;
 const toHHMM = (m: number) => `${pad2(Math.floor(m / 60) % 24)}:${pad2(m % 60)}`;
 

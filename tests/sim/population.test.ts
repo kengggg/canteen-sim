@@ -100,3 +100,54 @@ test('reference arrival ms for groupIds 0-9 at seed 1 are pinned', () => {
 });
 
 const PINNED = [4098500, 4587477, 3504393, 5841797, 3343868, 3943773, 5437900, 5207194, 3500063, 5742489];
+
+describe('leaving draws (model 2, design §2.1)', () => {
+  test('room needed scales inversely with the wait limit, at least 1; 0 turns the check off', async () => {
+    const { roomNeededFor } = await import('../../src/sim/population');
+    expect(roomNeededFor(3, 600, 600_000)).toBe(3);
+    expect(roomNeededFor(3, 600, 300_000)).toBe(6);
+    expect(roomNeededFor(3, 600, 1_200_000)).toBe(2);
+    expect(roomNeededFor(3, 600, 10_000_000)).toBe(1);
+    expect(roomNeededFor(0, 600, 1)).toBe(0);
+  });
+
+  test('wait limits at the defaults: 90% of groups between about 4.1 and 19.5 minutes', () => {
+    const lo = lognormalMs(600, 0.5, 0.05), hi = lognormalMs(600, 0.5, 0.95);
+    expect(lo).toBeGreaterThanOrEqual(246_000);
+    expect(lo).toBeLessThanOrEqual(247_500);
+    expect(hi).toBeGreaterThanOrEqual(1_166_000);
+    expect(hi).toBeLessThanOrEqual(1_169_000);
+  });
+
+  test('each group draws its wait limit and room needed from stream 12, keyed by groupId', async () => {
+    const { roomNeededFor } = await import('../../src/sim/population');
+    expect(STREAM.leave).toBe(12);
+    const pop = buildPopulation(defaultConfig(), 1);
+    for (let g = 0; g < pop.groupCount; g++) {
+      const u = uniform(1, 12, pop.groupId[g]);
+      expect(pop.leavePct[g]).toBe(u);
+      expect(pop.waitLimitMs[g]).toBe(lognormalMs(600, 0.5, u));
+      expect(pop.roomNeeded[g]).toBe(roomNeededFor(3, 600, pop.waitLimitMs[g]));
+    }
+  });
+
+  test('with no spread every group has the average limit and the set room needed', () => {
+    const c = defaultConfig();
+    c.leave.waitCV = 0;
+    const pop = buildPopulation(c, 7);
+    for (let g = 0; g < pop.groupCount; g++) {
+      expect(pop.waitLimitMs[g]).toBe(600_000);
+      expect(pop.roomNeeded[g]).toBe(3);
+    }
+  });
+
+  test('nested crowds keep each common group’s wait limit', () => {
+    const small = defaultConfig(), big = defaultConfig();
+    small.crowd.totalPeople = 800;
+    big.crowd.totalPeople = 2600;
+    const a = buildPopulation(small, 3), b = buildPopulation(big, 3);
+    const byId = new Map<number, number>();
+    for (let g = 0; g < b.groupCount; g++) byId.set(b.groupId[g], b.waitLimitMs[g]);
+    for (let g = 0; g < a.groupCount; g++) expect(byId.get(a.groupId[g])).toBe(a.waitLimitMs[g]);
+  });
+});

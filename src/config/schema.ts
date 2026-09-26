@@ -16,7 +16,8 @@ export interface Config {
   stalls: { serviceMean: number; serviceCV: number; popularitySkew: number; queueAversion: number };
   eat: { mean: number; cv: number; linger: number };
   move: { walkSpeed: number; traySpeed: number };
-  search: { visibility: number; patience: number; parallel: boolean; emptyTableDetour: number };
+  search: { visibility: number; patience: number; splitAfter: number; parallel: boolean; emptyTableDetour: number };
+  leave: { waitMean: number; waitCV: number; roomNeeded: number };
   tray: { dropTime: number; slots: number };
   layout: {
     cols: number;
@@ -37,7 +38,8 @@ export function defaultConfig(): Config {
     stalls: { serviceMean: 90, serviceCV: 0.5, popularitySkew: 0.6, queueAversion: 1.0 },
     eat: { mean: 1080, cv: 0.3, linger: 0 },
     move: { walkSpeed: 1.3, traySpeed: 1.0 },
-    search: { visibility: 10, patience: 300, parallel: false, emptyTableDetour: 0 },
+    search: { visibility: 10, patience: 300, splitAfter: 120, parallel: false, emptyTableDetour: 0 },
+    leave: { waitMean: 600, waitCV: 0.5, roomNeeded: 3 },
     tray: { dropTime: 5, slots: 3 },
     layout: { cols: 10, rows: 10, seatsPerSide: 3, verticalAisle: 1.2, horizontalAisle: 0.75, stallCount: 30, queueDepth: 5.0 },
   };

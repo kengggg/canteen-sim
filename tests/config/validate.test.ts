@@ -13,7 +13,8 @@ test('defaults match spec §9.1 in internal units', () => {
   expect(c.reserve).toEqual({ percentA: 0.5, claimMode: 'oneClaimer', claimSearchLimit: 60, shareMinEmpty: 4, shareMaxParty: 2 });
   expect(c.stalls.serviceMean).toBe(90);
   expect(c.eat.mean).toBe(1080);
-  expect(c.search).toEqual({ visibility: 10, patience: 300, parallel: false, emptyTableDetour: 0 });
+  expect(c.search).toEqual({ visibility: 10, patience: 300, splitAfter: 120, parallel: false, emptyTableDetour: 0 });
+  expect(c.leave).toEqual({ waitMean: 600, waitCV: 0.5, roomNeeded: 3 });
 });
 
 test('door rules with stallCount = 10 (spec §13.1)', () => {

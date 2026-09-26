@@ -55,6 +55,12 @@ export function lognormalMs(meanS: number, cv: number, u: number): number {
   return Math.max(1, Math.round(x * 1000));
 }
 
+/** Room needed (design §2.1): 0 turns the seating check off; otherwise max(1, round(roomNeeded · waitMeanMs / L_g)). */
+export function roomNeededFor(roomNeeded: number, waitMeanS: number, waitLimitMs: number): number {
+  if (roomNeeded === 0) return 0;
+  return Math.max(1, Math.round((roomNeeded * Math.round(waitMeanS * 1000)) / waitLimitMs));
+}
+
 export interface Population {
   seed: number;
   groupCount: number;
@@ -66,6 +72,10 @@ export interface Population {
   firstPerson: Int32Array;
   reserveDraw: Float64Array;
   objectType: Uint8Array;
+  /** Patience percentile u(leave, groupId), its wait limit (ms) and room needed (tables), design §2.1. */
+  leavePct: Float64Array;
+  waitLimitMs: Int32Array;
+  roomNeeded: Int32Array;
   // Per person, dense, ascending personId.
   personId: Int32Array;
   group: Int32Array;
@@ -109,6 +119,9 @@ export function buildPopulation(c: Config, seed: number): Population {
     firstPerson: new Int32Array(G),
     reserveDraw: new Float64Array(G),
     objectType: new Uint8Array(G),
+    leavePct: new Float64Array(G),
+    waitLimitMs: new Int32Array(G),
+    roomNeeded: new Int32Array(G),
     personId: new Int32Array(heads),
     group: new Int32Array(heads),
     member: new Uint8Array(heads),
@@ -127,6 +140,9 @@ export function buildPopulation(c: Config, seed: number): Population {
     pop.firstPerson[gi] = p;
     pop.reserveDraw[gi] = uniform(seed, STREAM.reserve, g);
     pop.objectType[gi] = Math.floor(uniform(seed, STREAM.object, g) * 3);
+    pop.leavePct[gi] = uniform(seed, STREAM.leave, g);
+    pop.waitLimitMs[gi] = lognormalMs(c.leave.waitMean, c.leave.waitCV, pop.leavePct[gi]);
+    pop.roomNeeded[gi] = roomNeededFor(c.leave.roomNeeded, c.leave.waitMean, pop.waitLimitMs[gi]);
     for (let m = 0; m < n; m++, p++) {
       const pid = 6 * g + m;
       pop.personId[p] = pid;

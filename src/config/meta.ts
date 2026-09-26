@@ -9,7 +9,7 @@ export type SettingType = 'int' | 'number' | 'time' | 'mix6' | 'enum' | 'bool';
 export interface SettingMeta {
   id: string;
   label: string;
-  group: 'Crowd' | 'Reservation' | 'Stalls' | 'Eating' | 'Movement & search' | 'Tray return' | 'Layout';
+  group: 'Crowd' | 'Reservation' | 'Stalls' | 'Eating' | 'Leaving' | 'Movement & search' | 'Tray return' | 'Layout';
   type: SettingType;
   /** Internal unit and the factor from internal to UI units (UI = internal × uiFactor). */
   unit: string;
@@ -43,10 +43,14 @@ export const META: SettingMeta[] = [
   { id: 'eat.mean', label: 'Eating time', group: 'Eating', type: 'number', unit: 's', uiUnit: 'min', uiFactor: 1 / 60, min: 180, max: 3600, step: 60, help: 'Average time to eat.' },
   { id: 'eat.cv', label: 'Eating variability', group: 'Eating', type: 'number', unit: '', uiUnit: '', uiFactor: 1, min: 0, max: 1, step: 0.05, help: 'Coefficient of variation of eating time.' },
   { id: 'eat.linger', label: 'Linger', group: 'Eating', type: 'number', unit: 's', uiUnit: 'min', uiFactor: 1 / 60, min: 0, max: 1800, step: 60, help: 'Extra time a group stays after the slowest member finishes.' },
+  { id: 'leave.waitMean', label: 'Wait limit', group: 'Leaving', type: 'number', unit: 's', uiUnit: 'min', uiFactor: 1 / 60, min: 30, max: 3600, step: 30, help: 'Average longest wait a group accepts, at the door or in a queue; groups vary around it.' },
+  { id: 'leave.waitCV', label: 'Wait limit spread', group: 'Leaving', type: 'number', unit: '', uiUnit: '', uiFactor: 1, min: 0, max: 1.5, step: 0.05, help: 'Coefficient of variation of the wait limits (0 = every group the same).' },
+  { id: 'leave.roomNeeded', label: 'Room needed', group: 'Leaving', type: 'int', unit: 'tables', uiUnit: 'tables', uiFactor: 1, min: 0, max: 20, step: 1, help: 'Tables that must look free enough for a group with the average wait limit to stay (0 = no seating check).' },
   { id: 'move.walkSpeed', label: 'Walking speed', group: 'Movement & search', type: 'number', unit: 'm/s', uiUnit: 'm/s', uiFactor: 1, min: 0.5, max: 2, step: 0.05, help: 'Walking speed without a tray.' },
   { id: 'move.traySpeed', label: 'Tray speed', group: 'Movement & search', type: 'number', unit: 'm/s', uiUnit: 'm/s', uiFactor: 1, min: 0.3, max: 2, step: 0.05, help: 'Walking speed while carrying food or a used tray.' },
   { id: 'search.visibility', label: 'Visibility', group: 'Movement & search', type: 'number', unit: 'm', uiUnit: 'm', uiFactor: 1, min: 2, max: 100, step: 1, help: 'How far a searcher can see tables (no walls block the view).' },
   { id: 'search.patience', label: 'Patience', group: 'Movement & search', type: 'number', unit: 's', uiUnit: 'min', uiFactor: 1 / 60, min: 30, max: 1800, step: 30, help: 'How long a free-flow group searches with food before walking away.' },
+  { id: 'search.splitAfter', label: 'Split after', group: 'Movement & search', type: 'number', unit: 's', uiUnit: 'min', uiFactor: 1 / 60, min: 0, max: 1800, step: 30, help: 'How long a group circles with food before accepting seats at more than one table (0 = straight away).' },
   { id: 'search.parallel', label: 'Search in parallel', group: 'Movement & search', type: 'bool', unit: '', uiUnit: '', uiFactor: 1, min: 0, max: 1, step: 1, help: 'Every groupmate with food searches, instead of waiting at the stall.' },
   { id: 'search.emptyTableDetour', label: 'Empty-table detour', group: 'Movement & search', type: 'number', unit: 'm', uiUnit: 'm', uiFactor: 1, min: 0, max: 40, step: 1, help: 'Walk up to this much farther to sit at a completely empty table.' },
   { id: 'tray.dropTime', label: 'Tray drop time', group: 'Tray return', type: 'number', unit: 's', uiUnit: 's', uiFactor: 1, min: 1, max: 60, step: 1, help: 'Time to drop a tray at the return counter.' },
