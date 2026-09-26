@@ -29,9 +29,13 @@ test('B at defaults runs to done: not truncated, everyone out', () => {
   expect(r.arrivals).toBe(r.seated + r.leftPeople);
 });
 
-test('everybody passes the tray return before exiting', () => {
+test('everybody who ate passes the tray return before exiting; people who left without eating skip it', () => {
   const w = B.w;
   for (let p = 0; p < w.pop.personCount; p++) {
+    if (w.leftKind[p] !== 0) {
+      expect(w.dropEndMs[p]).toBe(-1);
+      continue;
+    }
     expect(w.dropEndMs[p]).toBeGreaterThanOrEqual(0);
     expect(w.dropEndMs[p]).toBeLessThanOrEqual(w.exitMs[p]);
   }

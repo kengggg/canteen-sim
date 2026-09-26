@@ -1,6 +1,7 @@
 import { popcount, chooseJoin, chooseUnclaimed, fillOrder, joinAllowed, ownSeat } from './seating';
 import { Memory, claimTarget, exploreTarget, freeFlowTarget, observe, splitTarget, type TableTruth } from './search';
-import { ASK_MS, EV, GM, K, PH, PLACE_MS, PU, RECHOOSE_MS, REFUSE_MS, SIT_MS, STAND_MS } from './types';
+import { LEAVE_NOW } from './stalls';
+import { ASK_MS, EV, GM, K, LEFT, PH, PICKUP_MS, PLACE_MS, PU, RECHOOSE_MS, REFUSE_MS, SIT_MS, STAND_MS } from './types';
 import type { GroupState, World } from './world';
 
 /** Group and person behaviour (spec §5). Every function runs inside one event at w.now. */
@@ -9,6 +10,175 @@ const truthOf = (w: World): TableTruth => ({ occMask: w.occMask, heldMask: w.hel
 
 export function install(w: World): void {
   w.onReach = onReach;
+  w.onDeferredLeave = leaveQueue;
+}
+
+// ---------------------------------------------------------------- leaving before food (design §2.2–2.4)
+
+/**
+ * The door check (design §2.2): 1 when even the shortest queue looks longer than the group's wait limit, 2 when fewer
+ * tables look like a fit than its room needed, 3 when both fail, 0 when the group stays.
+ */
+export function doorVerdict(a: { minQueueMs: number; waitLimitMs: number; fitTables: number; roomNeeded: number }): number {
+  const queue = a.minQueueMs > a.waitLimitMs;
+  const seating = a.roomNeeded > 0 && a.fitTables < a.roomNeeded;
+  return queue ? (seating ? LEFT.DOOR_BOTH : LEFT.DOOR_QUEUE) : seating ? LEFT.DOOR_SEATING : LEFT.NONE;
+}
+
+/** Unclaimed tables with at least n seats nobody sits on (a full scan; the engine keeps World.fitCount instead). */
+export function fitTables(occMask: Int32Array, claimedBy: Int32Array, k2: number, n: number): number {
+  let c = 0;
+  for (let t = 0; t < occMask.length; t++) if (claimedBy[t] < 0 && k2 - popcount(occMask[t]) >= n) c++;
+  return c;
+}
+
+function doorCheck(w: World, G: GroupState): number {
+  let minQ = Infinity;
+  for (let s = 0; s < w.st.S; s++) {
+    const q = w.st.queueLength[s] * w.serviceMeanMs;
+    if (q < minQ) minQ = q;
+  }
+  return doorVerdict({ minQueueMs: minQ, waitLimitMs: w.pop.waitLimitMs[G.g], fitTables: w.fitTablesFor(G.size), roomNeeded: w.pop.roomNeeded[G.g] });
+}
+
+/** The whole group turns round at the entrance and walks to the exit. */
+function leaveAtDoor(w: World, G: GroupState, kind: number): void {
+  const out = members(G).slice();
+  G.people = [];
+  G.size = 0;
+  for (const p of out) {
+    w.leftKind[p] = kind;
+    w.leftMs[p] = w.now;
+    w.leftPeople++;
+    w.leftDoor[kind - 1]++;
+    w.setPhase(p, PH.TO_EXIT);
+    w.setTrip(p, w.pc.G.exitNode, PU.EXIT);
+  }
+}
+
+/** First arrival at a stall walkway stop: the queue clock starts and the wait-limit timer is set (design §2.3). */
+function startQueueClock(w: World, p: number): void {
+  if (w.queueStartMs[p] >= 0) return;
+  w.queueStartMs[p] = w.now;
+  w.schedule(w.now + w.pop.waitLimitMs[w.pop.group[p]], K.TIMER, w.pidOf(p), EV.QUEUE_LEAVE, p);
+}
+
+export function onQueueLeaveTimer(w: World, p: number): void {
+  if (w.leftKind[p] !== 0 || w.st.serviceStartMs[p] >= 0) return;
+  switch (w.phase[p]) {
+    case PH.QUEUE:
+      w.st.now = w.now;
+      if (w.st.requestLeave(p) === LEAVE_NOW) leaveQueue(w, p);
+      return;
+    case PH.FULL_WAIT:
+      memberLeaves(w, p);
+      goOut(w, p);
+      return;
+    case PH.TO_STALL:
+      w.st.releaseChoice(p);
+      memberLeaves(w, p);
+      goOut(w, p);
+      return;
+    case PH.TO_FULLSTOP:
+      memberLeaves(w, p);
+      goOut(w, p);
+      return;
+  }
+}
+
+/** p has left its slot (now, or at the end of a deferred walk-in or move-up): walk back to the walkway stop. */
+function leaveQueue(w: World, p: number): void {
+  memberLeaves(w, p);
+  const at = w.st.walkBack(p);
+  w.setPhase(p, PH.LEAVE_WALK);
+  w.schedule(at, K.MOVE, w.pidOf(p), EV.LEAVE_ARRIVE, p);
+}
+
+/** Kind 3: a queue leaver is back at the walkway stop. */
+export function leaveArrive(w: World, p: number): void {
+  w.mv.placeAt(p, w.pc.G.stallNode[w.st.chosen[p]]);
+  goOut(w, p);
+}
+
+/** A leaver walks to the exit, or first back to its group's object. */
+function goOut(w: World, p: number): void {
+  if (w.collecting[p]) {
+    w.setPhase(p, PH.TO_OBJECT);
+    w.setTrip(p, w.originOf(p).claimNode, PU.OBJECT);
+  } else {
+    w.setPhase(p, PH.TO_EXIT);
+    w.setTrip(p, w.pc.G.exitNode, PU.EXIT);
+  }
+}
+
+/** p gives up in a queue: it leaves its party alone; the rest carry on (design §2.3, §2.4). */
+function memberLeaves(w: World, p: number): void {
+  const G = w.groupOf(p);
+  w.leftKind[p] = LEFT.QUEUE;
+  w.leftMs[p] = w.now;
+  w.leftPeople++;
+  w.leftQueue++;
+  w.setQueuing(p, false);
+  const s = w.seat[p];
+  if (s >= 0) {
+    const t = w.tableOfSeat(s);
+    w.heldMask[t] &= ~(1 << (s - t * w.k2));
+    w.seatGroup[s] = -1;
+    w.seatPerson[s] = -1;
+    w.seat[p] = -1;
+    w.recomputeTable(t);
+  }
+  G.people = G.people.filter((x) => x !== p);
+  G.size = G.people.length;
+  if (G.size > 0) G.first = G.people[0];
+  G.sumCache = null;
+  w.trace?.('qleave', G.party, p, 0);
+  if (G.mode === GM.CLAIMED) {
+    const t = G.claimTable;
+    if (G.size === 0) {
+      w.collecting[p] = 1;
+      w.trace?.('collect', G.g, t, p);
+    } else if (G.sitStarted === G.size && w.complete[t] === 0) {
+      w.complete[t] = 1;
+      w.recomputeTable(t);
+    }
+  }
+  if (G.size > 0 && G.eatDone > 0 && G.eatDone === G.size) {
+    w.schedule(Math.max(w.now, G.maxEatEndMs + w.lingerMs), K.TIMER, w.pidOf(G.people[0]), EV.STAND_START, G.party);
+  }
+  if (G.mode === GM.FREE && G.committedTable < 0) {
+    for (const q of G.searchers.slice()) {
+      if (G.committedTable >= 0) break;
+      if (w.groupOf(q) !== G || !w.searching[q] || w.phase[q] !== PH.SEARCHING || w.mv.edge[q] >= 0 || w.mv.node[q] < 0) continue;
+      searchStep(w, q);
+    }
+  }
+}
+
+function startPickup(w: World, p: number): void {
+  const G = w.originOf(p);
+  w.mv.stop(p);
+  w.setPhase(p, PH.COLLECTING);
+  w.actionBusy(w.mv.node[p], 1);
+  w.trace?.('pickup', G.g, G.claimTable, p);
+  w.schedule(w.now + PICKUP_MS, K.ACTION, w.pidOf(p), EV.PICKUP_END, p);
+}
+
+/** Kind 1: the object is picked up; the table becomes ordinary and the collector walks out. */
+export function pickupEnd(w: World, p: number): void {
+  const G = w.originOf(p);
+  const t = G.claimTable;
+  w.actionBusy(w.mv.node[p], -1);
+  w.claimedBy[t] = -1;
+  w.claimedFlag[t] = 0;
+  w.complete[t] = 0;
+  w.claimSince[t] = -1;
+  w.recomputeTable(t);
+  w.objectsCollected++;
+  w.collecting[p] = 0;
+  w.trace?.('unclaim', G.g, t, 0);
+  w.setPhase(p, PH.TO_EXIT);
+  w.setTrip(p, w.pc.G.exitNode, PU.EXIT);
 }
 
 /** The party's active members (a live array: callers that remove members iterate over a copy). */
@@ -25,6 +195,12 @@ export function groupArrive(w: World, g: number): void {
   for (const p of members(G)) {
     w.entranceMs[p] = w.now;
     w.mv.placeAt(p, entrance);
+  }
+  const kind = doorCheck(w, G);
+  w.trace?.('door', g, kind, 0);
+  if (kind !== LEFT.NONE) {
+    leaveAtDoor(w, G, kind);
+    return;
   }
   if (!G.reserver) {
     for (const p of members(G)) goBuy(w, p);
@@ -116,6 +292,7 @@ function onReach(w: World, p: number): void {
   switch (w.purpose[p]) {
     case PU.STALL: {
       const s = w.st.chosen[p];
+      startQueueClock(w, p);
       w.mv.leave(p);
       w.setPhase(p, PH.QUEUE);
       w.setQueuing(p, true);
@@ -124,6 +301,7 @@ function onReach(w: World, p: number): void {
       return;
     }
     case PU.FULLSTOP:
+      startQueueClock(w, p);
       rechoose(w, p);
       return;
     case PU.CLAIM:
@@ -144,6 +322,9 @@ function onReach(w: World, p: number): void {
       return;
     case PU.EXIT:
       exit(w, p);
+      return;
+    case PU.OBJECT:
+      startPickup(w, p);
       return;
   }
 }
@@ -277,6 +458,7 @@ function claim(w: World, G: GroupState, t: number, n: number): void {
   G.mode = GM.CLAIMED;
   G.claimed = true;
   G.claimTable = t;
+  G.claimNode = n;
   G.claimEndMs = w.now;
   G.mem = null;
   G.frozen = false;
@@ -690,6 +872,7 @@ export function sitEnd(w: World, p: number): void {
 export function eatEnd(w: World, p: number): void {
   const G = w.groupOf(p);
   G.eatDone++;
+  G.maxEatEndMs = w.now;
   if (G.eatDone === G.size) w.schedule(w.now + w.lingerMs, K.TIMER, w.pidOf(G.people[0]), EV.STAND_START, G.party);
 }
 

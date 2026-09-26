@@ -19,6 +19,9 @@ export const EV = {
   RECHOOSE: 14,
   EAT_END: 15,
   STAND_START: 16,
+  QUEUE_LEAVE: 17,
+  LEAVE_ARRIVE: 18,
+  PICKUP_END: 19,
 } as const;
 
 /** Person phases. */
@@ -45,10 +48,18 @@ export const PH = {
   DROPPING: 19,
   TO_EXIT: 20,
   EXITED: 21,
+  /** Walking back from a queue slot to the walkway stop after giving up. */
+  LEAVE_WALK: 22,
+  /** The last member of a reserving group, walking back for the object. */
+  TO_OBJECT: 23,
+  COLLECTING: 24,
 } as const;
 
 /** Trip purposes: what happens on reaching the trip target. */
-export const PU = { NONE: 0, STALL: 1, FULLSTOP: 2, CLAIM: 3, EXPLORE: 4, TABLE: 5, SEAT: 6, TRAY: 7, EXIT: 8 } as const;
+export const PU = { NONE: 0, STALL: 1, FULLSTOP: 2, CLAIM: 3, EXPLORE: 4, TABLE: 5, SEAT: 6, TRAY: 7, EXIT: 8, OBJECT: 9 } as const;
+
+/** How a person left without eating (design §2.2–2.3): at the door (queues, seating or both) or from a queue. */
+export const LEFT = { NONE: 0, DOOR_QUEUE: 1, DOOR_SEATING: 2, DOOR_BOTH: 3, QUEUE: 4 } as const;
 
 /** Group modes. */
 export const GM = { FREE: 0, RESERVE: 1, CLAIMED: 2 } as const;
@@ -59,6 +70,7 @@ export const CLS = { CLAIMING: 0, QUEUING: 1, SEARCHING: 2, HOLDING: 3, EATING: 
 export const SIT_MS = 3000;
 export const STAND_MS = 3000;
 export const PLACE_MS = 3000;
+export const PICKUP_MS = 3000;
 export const ASK_MS = 5000;
 export const REFUSE_MS = 180_000;
 export const RECHOOSE_MS = 5000;

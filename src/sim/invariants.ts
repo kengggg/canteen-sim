@@ -68,6 +68,38 @@ export function checkInvariants(w: World): void {
   // Liveness (§4.2 rule 1): outside a pending kind-6 step, no FIFO head could enter now.
   if (!w.admitIsPending() && mv.admissibleHeads() > 0) fail('a FIFO head could enter but was not admitted');
 
+  // Door check (design §2.2): the incremental fit counts equal a full scan.
+  for (let n = 0; n <= k2; n++) {
+    let scan = 0;
+    for (let t = 0; t < w.pc.tableCount; t++) if (w.claimedBy[t] < 0 && k2 - popcount(w.occMask[t]) >= n) scan++;
+    if (w.fitTablesFor(n) !== scan) fail(`fit count for ${n} seats: ${w.fitTablesFor(n)} ≠ scan ${scan}`);
+  }
+
+  // Leaving (design §2.3–2.4): leavers are counted, hold no seat; a claimed table always has someone coming back.
+  let left = 0;
+  const collector = new Uint8Array(w.groups.length);
+  for (let p = 0; p < P; p++) {
+    if (w.leftKind[p] === 0) continue;
+    left++;
+    if (w.seat[p] >= 0) fail(`seat ${w.seat[p]} held for person ${p} who left`);
+    if (w.collecting[p]) collector[w.pop.group[p]] = 1;
+  }
+  if (left !== w.leftPeople) fail(`left count ${w.leftPeople} ≠ ${left} people marked as left`);
+  for (let t = 0; t < w.pc.tableCount; t++) {
+    const g = w.claimedBy[t];
+    if (g >= 0 && w.groups[g].size === 0 && !collector[g]) fail(`table ${t} claimed by group ${g} with nobody left to return`);
+  }
+
+  // Queues: no two people standing idle share a queue position.
+  for (let s = 0; s < w.st.S; s++) {
+    const seen = new Set<number>();
+    for (const q of w.st.members[s]) {
+      if (w.st.state[q] !== 0) continue;
+      if (seen.has(w.st.physPos[q])) fail(`stall ${s}: two people idle at queue position ${w.st.physPos[q]}`);
+      seen.add(w.st.physPos[q]);
+    }
+  }
+
   // Plates stay (design §2.5): nobody exits holding food.
   for (let p = 0; p < P; p++) if (w.phase[p] === PH.EXITED && w.hasFood[p]) fail(`person ${p} exited holding food`);
 

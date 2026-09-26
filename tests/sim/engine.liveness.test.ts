@@ -51,6 +51,7 @@ test('all-full re-choose runs every 5,000 ms after arriving at the walkway stop'
   const c = defaultConfig();
   c.layout.stallCount = 4;
   c.crowd.totalPeople = 600;
+  c.leave = { waitMean: 3600, waitCV: 0, roomNeeded: 0 }; // nobody gives up, so queues fill and people wait
   const times = new Map<number, number[]>();
   const s = new Sim(c, { seed: 1, reserveFraction: 0 });
   const w = s.world;

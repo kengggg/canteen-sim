@@ -102,7 +102,10 @@ test('pairMetrics: shared peak window, P3 in [0, 1], and reserver cohorts', () =
   expect(pm.cohorts.R.level.groups).toBe(A.world.groups.length);
   expect(pm.cohorts.N.level.people).toBe(0);
   expect(pm.cohorts.N.level.leftPct).toBeNull();
-  expect(pm.cohorts.Rclaimed.level.groups + pm.cohorts.Rfallback.level.groups).toBe(pm.cohorts.R.level.groups);
+  // Every reserving group claimed, fell back, or left at the door before trying.
+  const doorLeft = A.world.groups.filter((G) => A.world.leftKind[A.world.pop.firstPerson[G.g]] >= 1 && A.world.leftKind[A.world.pop.firstPerson[G.g]] <= 3).length;
+  expect(doorLeft).toBeGreaterThan(0);
+  expect(pm.cohorts.Rclaimed.level.groups + pm.cohorts.Rfallback.level.groups + doorLeft).toBe(pm.cohorts.R.level.groups);
   expect(pm.cohorts.Rclaimed.baseline.groups).toBe(pm.cohorts.Rclaimed.level.groups);
   const sum = pm.sharesLevel.reduce((a, b) => a + b, 0);
   expect(sum).toBeCloseTo(1, 9);

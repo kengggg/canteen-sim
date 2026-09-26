@@ -24,6 +24,15 @@ export interface RunMetrics {
   leftPeople: number;
   /** P1: left without eating, % of arrivals. */
   leftPct: number | null;
+  /** Left at the door because of the queues, the seating, or both; and left from a queue (people). */
+  leftDoorQueues: number;
+  leftDoorSeating: number;
+  leftDoorBoth: number;
+  leftQueue: number;
+  leftDoorPct: number | null;
+  leftQueuePct: number | null;
+  /** Objects a reserving group's last member walked back to collect. */
+  objectsCollected: number;
   /** P2: time carrying a plate (service end → sit start), mean over everyone served. */
   plateMeanMin: number | null;
   /** P4. */
@@ -165,6 +174,13 @@ export function computeRunMetrics(w: World): RunMetrics {
     seated,
     leftPeople: w.leftPeople,
     leftPct: arrivals > 0 ? (100 * w.leftPeople) / arrivals : null,
+    leftDoorQueues: w.leftDoor[0],
+    leftDoorSeating: w.leftDoor[1],
+    leftDoorBoth: w.leftDoor[2],
+    leftQueue: w.leftQueue,
+    leftDoorPct: arrivals > 0 ? (100 * (w.leftDoor[0] + w.leftDoor[1] + w.leftDoor[2])) / arrivals : null,
+    leftQueuePct: arrivals > 0 ? (100 * w.leftQueue) / arrivals : null,
+    objectsCollected: w.objectsCollected,
     plateMeanMin: min(meanOrNull(plate)),
     peakThroughputPerHour: peakThroughput(w.sitTimes),
     plateMedianMin: min(quantile(plate, 50)),

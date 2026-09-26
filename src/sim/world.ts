@@ -58,6 +58,10 @@ export interface GroupState {
   // Per original group (kept on the origin): split commits and the latest commit ms.
   splits: number;
   lastCommitMs: number;
+  /** Access node where the claimer placed the object (a collector walks back there). */
+  claimNode: number;
+  /** Latest eat end among the party's members so far. */
+  maxEatEndMs: number;
   // Eating and leaving.
   sitStarted: number;
   eatDone: number;
@@ -81,6 +85,7 @@ function blankParty(g: number, party: number, origin: GroupState | null, people:
     claimEndMs: -1, firstSide: 0, fill: [], fillIdx: 0, history: [], sumCache: null,
     searcher: -1, searchers: [], mem: null, targetOf: new Map(), committedTable: -1, joinedTable: -1, commitMs: -1,
     searcherFoodMs: -1, searchStartMs: -1, splitMode: false, splitStamp: 0, pendingAsks: 0, splits: 0, lastCommitMs: -1,
+    claimNode: -1, maxEatEndMs: -1,
     sitStarted: 0, eatDone: 0, standLeft: 0,
   };
   if (!origin) G.origin = G;
@@ -109,6 +114,7 @@ export class World {
   readonly splitAfterMs: number;
   readonly claimLimitMs: number;
   readonly lingerMs: number;
+  readonly serviceMeanMs: number;
   readonly dropMs: number;
   readonly detourMm: number;
   readonly k: number;
@@ -156,6 +162,11 @@ export class World {
   readonly plateNoSeat: Uint8Array;
   /** How the person left without eating (types LEFT); 0 while they have not. */
   readonly leftKind: Uint8Array;
+  readonly leftMs: Float64Array;
+  /** First arrival at a stall walkway stop (design §2.3 queue start); −1 before. */
+  readonly queueStartMs: Float64Array;
+  /** 1 for the member walking back for its group's object. */
+  readonly collecting: Uint8Array;
 
   // Per group (original groups) and per party (original groups first, then parties split off them).
   readonly groups: GroupState[];
@@ -172,6 +183,9 @@ export class World {
   readonly seatState: Uint8Array;
   readonly seatGroup: Int32Array;
   readonly seatPerson: Int32Array;
+  /** Per table: unoccupied seats if unclaimed, else −1; and how many unclaimed tables have each count (door check). */
+  readonly tableFree: Int8Array;
+  readonly fitCount: Int32Array;
 
   // Tray return.
   trayBusy = 0;
@@ -181,8 +195,11 @@ export class World {
   // Counters.
   arrived = 0;
   exited = 0;
-  /** People who left without eating (design §4.1 P1 numerator). */
+  /** People who left without eating (design §4.1 P1 numerator), by where: door (queues, seating, both) and queue. */
   leftPeople = 0;
+  readonly leftDoor = [0, 0, 0];
+  leftQueue = 0;
+  objectsCollected = 0;
   turnedAwayClaimed = 0;
   turnedAwayHeld = 0;
   fallbackGroups = 0;
@@ -220,6 +237,7 @@ export class World {
     this.splitAfterMs = Math.round(cfg.search.splitAfter * 1000);
     this.claimLimitMs = Math.round(cfg.reserve.claimSearchLimit * 1000);
     this.lingerMs = Math.round(cfg.eat.linger * 1000);
+    this.serviceMeanMs = Math.round(cfg.stalls.serviceMean * 1000);
     this.dropMs = Math.round(cfg.tray.dropTime * 1000);
     this.detourMm = Math.round(cfg.search.emptyTableDetour * 1000);
     this.k = lp.seatsPerSide;
@@ -274,6 +292,9 @@ export class World {
     this.nodeWaitSince = new Float64Array(P).fill(-1);
     this.plateNoSeat = new Uint8Array(P);
     this.leftKind = new Uint8Array(P);
+    this.leftMs = new Float64Array(P).fill(-1);
+    this.queueStartMs = new Float64Array(P).fill(-1);
+    this.collecting = new Uint8Array(P);
 
     const G = this.pop.groupCount;
     this.groups = new Array(G);
@@ -299,6 +320,9 @@ export class World {
     this.seatState = new Uint8Array(seats);
     this.seatGroup = new Int32Array(seats).fill(-1);
     this.seatPerson = new Int32Array(seats).fill(-1);
+    this.tableFree = new Int8Array(T).fill(this.k2);
+    this.fitCount = new Int32Array(this.k2 + 1);
+    this.fitCount[this.k2] = T;
   }
 
   // ---------------------------------------------------------------- scheduling
@@ -382,10 +406,23 @@ export class World {
     return ~(this.occMask[t] | this.heldMask[t]) & this.fullMask;
   }
 
+  /** Unclaimed tables with at least n unoccupied seats: the tables that look like a fit from the door (O(k2)). */
+  fitTablesFor(n: number): number {
+    let c = 0;
+    for (let f = Math.max(0, n); f <= this.k2; f++) c += this.fitCount[f];
+    return c;
+  }
+
   /** Recompute the §7.1 states of one table's seats and update the seat clock. */
   recomputeTable(t: number): void {
     const occ = this.occMask[t], held = this.heldMask[t];
     const claimed = this.claimedBy[t] >= 0;
+    const fit = claimed ? -1 : this.k2 - popcount(occ);
+    if (fit !== this.tableFree[t]) {
+      if (this.tableFree[t] >= 0) this.fitCount[this.tableFree[t]]--;
+      if (fit >= 0) this.fitCount[fit]++;
+      this.tableFree[t] = fit;
+    }
     const freeCount = popcount(this.freeMaskOf(t));
     const shareMin = this.cfg.reserve.shareMinEmpty;
     for (let j = 0; j < this.k2; j++) {
