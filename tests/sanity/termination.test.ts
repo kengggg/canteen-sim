@@ -8,8 +8,10 @@ function littlesLaw(s: ReturnType<typeof run>): void {
   for (let p = 0; p < w.pop.personCount; p++) {
     const st = w.st.chosen[p];
     if (w.st.joinMs[p] < 0) continue;
-    wait[st] += w.st.serviceStartMs[p] - w.st.joinMs[p];
-    sojourn[st] += w.st.serviceEndMs[p] - w.st.joinMs[p];
+    // Queue leavers (design §2.3) count until they leave.
+    const left = w.st.leaveMs[p];
+    wait[st] += (w.st.serviceStartMs[p] >= 0 ? w.st.serviceStartMs[p] : left) - w.st.joinMs[p];
+    sojourn[st] += (w.st.serviceEndMs[p] >= 0 ? w.st.serviceEndMs[p] : left) - w.st.joinMs[p];
   }
   for (let st = 0; st < w.st.S; st++) {
     expect(w.st.accWaiting[st]).toBe(wait[st]);
@@ -26,13 +28,17 @@ test.each(SEEDS)('default termination and Little’s law, seed %i, A at 100% and
   }
 });
 
-test('Crush, narrow vertical aisles and together mode terminate', () => {
+// Design §7.3: nobody can leave holding food, so a crowded lunch could jam; every preset must still finish.
+test.each(['quiet', 'crush', 'reservationFriendly'].flatMap((id) => SEEDS.map((seed) => [id, seed] as const)))('preset %s terminates, seed %i, A at 100% and B', (id, seed) => {
+  for (const f of [1, 0]) {
+    const s = run(presetConfig(id), seed, f);
+    expect(s.truncated).toBe(false);
+    expect(s.world.exited).toBe(s.world.pop.personCount);
+  }
+});
+
+test('narrow vertical aisles and together mode terminate', () => {
   for (const seed of [1, 2, 3]) {
-    for (const f of [1, 0]) {
-      const crush = run(presetConfig('crush'), seed, f);
-      expect(crush.truncated).toBe(false);
-      expect(crush.world.exited).toBe(crush.world.pop.personCount);
-    }
     const narrow = defaultConfig();
     narrow.layout.verticalAisle = 0.6;
     for (const f of [1, 0]) {

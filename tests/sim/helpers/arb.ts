@@ -64,4 +64,7 @@ export const smallConfigArb: fc.Arbitrary<{ cfg: Config; fraction: number }> = f
     return { cfg: c, fraction: r.fraction };
   });
 
+/** Seat demand over the window: people × (eating + linger) ÷ (seats × window). */
+export const seatLoad = (c: Config) => (c.crowd.totalPeople * (c.eat.mean + c.eat.linger)) / (2 * c.layout.seatsPerSide * c.layout.cols * c.layout.rows * (c.crowd.windowEnd - c.crowd.windowStart) * 60);
+
 export const offeredLoad = (c: Config) => (c.crowd.totalPeople * c.stalls.serviceMean) / (c.layout.stallCount * (c.crowd.windowEnd - c.crowd.windowStart) * 60);
