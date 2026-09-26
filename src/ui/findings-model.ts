@@ -28,26 +28,43 @@ const minMax = (xs: number[]): [number, number] => [Math.min(...xs), Math.max(..
 export interface Gap { mean: number; lo: number | null; hi: number | null; W: number; T: number; L: number; n: number }
 export interface HeadRow {
   f: number;
-  walkPct: number;
-  walkPeople: number;
-  e2sMin: number;
+  /** P1: left without eating, %; and people per lunch. */
+  leftPct: number;
+  leftPeople: number;
+  /** P2: time carrying a plate, minutes. */
+  plateMin: number;
   utilPct: number;
   thr: number;
   /** Gaps as reservation minus free flow, in display units (pp, s, pp, people/h); null at 0%. */
-  walk: Gap | null;
-  e2sS: Gap | null;
+  left: Gap | null;
+  plateS: Gap | null;
   util: Gap | null;
   thrGap: Gap | null;
 }
 export interface SeatSlice { occupied: number; held: number; waiting: number; beyondSize: number; blocked: number; open: number; free: number }
 export interface CohortCell { level: number; baseline: number }
+/** Shares of arrivals leaving at the door (by reason) and from a queue, at one level. */
+export interface LeaveSlice { doorQueues: number; doorSeating: number; doorBoth: number; door: number; queue: number; all: number }
 export interface FindingsModel {
   n: number;
   head: HeadRow[];
-  /** At 25%, the gap as a share of the gap at 100% (walk-aways, seat use, throughput, time). */
-  shareAt25: { walk: number; util: number; thr: number; e2s: number };
+  /** At 25%, the gap as a share of the gap at 100% (leaving, seat use, throughput, plate time). */
+  shareAt25: { left: number; util: number; thr: number; plate: number };
   /** 100% minus 75%, paired per lunch. */
-  topStep: { walk: PairedStat; thr: PairedStat; e2sS: PairedStat };
+  topStep: { left: PairedStat; thr: PairedStat; plateS: PairedStat };
+  /** Entrance to seat for people who sat (a secondary measure): free flow, and each level's gap in seconds. */
+  seatedE2s: { b: number; gapS: Record<ReserveLevelKey, Gap> };
+  queueWait: { b: number; a100: number };
+  leave: Record<LevelKey, LeaveSlice>;
+  /** Share of door leavers whose reason included the seating (seating or both), per level. */
+  doorSeatingShare: Record<LevelKey, number>;
+  /** Share of arrivals leaving at the door or from a queue by 10-minute arrival bin (bin i starts at minute 10i). */
+  leaveByArrival: { binMid: number[]; door: Record<LevelKey, (number | null)[]>; queue: Record<LevelKey, (number | null)[]> };
+  /** Reserving groups per lunch that turned round at the door before trying to claim. */
+  doorLeftReservers: Record<ReserveLevelKey, number>;
+  /** People holding food with no seat, every 5 minutes from 11:00 (index i = minute 5i), and the lunch peak. */
+  plates: { minutes: number[]; byLevel: Record<LevelKey, number[]>; peak: Record<LevelKey, number> };
+  groupsSplitPct: Record<LevelKey, number>;
   /** Busiest-hour seat shares per level (0% = the baseline of the 100% pairs). */
   seats: Record<LevelKey, SeatSlice>;
   reservedEmpty: Record<ReserveLevelKey, number>;
@@ -75,6 +92,7 @@ export interface FindingsModel {
   claimShare: Record<ReserveLevelKey, number>;
   rushClaims: Record<ReserveLevelKey, number>;
   rushFallbacks: Record<ReserveLevelKey, number>;
+  /** Left-without-eating % per cohort (level) and the same groups under free flow (baseline). */
   cohorts: Record<'Rclaimed' | 'Rfallback' | 'N' | 'R', Partial<Record<ReserveLevelKey, CohortCell>>>;
   /** Extra seconds from entrance to seat for groups that claimed a table, vs the same groups in free flow. */
   claimedDelayS: [number, number];
@@ -90,17 +108,10 @@ export interface FindingsModel {
   fallbackVsSameTime: { f: number; actual: number; atNonReserverRates: number }[];
   /** Largest gap (pp) between reservers who found no table and non-reservers arriving at the same times. */
   fallbackSameTimeMaxGap: number;
-  /** Walk-away % of people by group size (3–6) per level. */
+  /** Left-without-eating % of people by group size (1–6) per level. */
   bySize: { size: number; pct: Record<LevelKey, number> }[];
-  bigGroupsWalkShare0: number;
-  bigGroupsGroupShare: number;
-  bigGroupsPeopleShare: number;
-  midGroupsWalkShare: { b: number; a100: number };
-  pairWalkAways: { groups: number; level: number | null };
-  soloWalkAways: number;
-  /** Walk-aways at 100% as a multiple of free flow's. */
-  walkRatio: number;
-  anatomy: { totalGroups: number; tooFew: number; oneTable0: number; oneTableReserve: [number, number]; emptyAmongFit0: number; nearestFitM0: number | null; freeSeats0: number; freeSeatsReserve: [number, number] };
+  /** Leaving at 100% as a multiple of free flow's. */
+  leftRatio: number;
   time: Findings['time'];
   fallbacks75: number;
   fallbacks100: number;
@@ -110,9 +121,8 @@ export interface FindingsModel {
   comparisons: number;
   chartIntervals: number;
   allFourAt100: boolean;
-  lunch1: { walkB: number; rank: number; gap50: number; meanGap50: number };
+  lunch1: { leftB: number; rank: number; gap50: number; meanGap50: number };
   lunches100BelowAt75: number;
-  servedAfterShare: number;
 }
 
 function stat(b: BatchResult, id: string, f: number): MetricStat {
@@ -140,20 +150,19 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
   const shareMean = (f: number, i: number, side: 'sharesLevel' | 'sharesBaseline') => mean(pairs(f).map((p) => p.pm[side][i]));
 
   const head: HeadRow[] = LEVELS.map((f) => {
-    const w = f === 0 ? null : stat(b, 'walkAwayPct', f);
-    const e = f === 0 ? null : stat(b, 'entranceToSeatMeanMin', f);
+    const l = f === 0 ? null : stat(b, 'leftPct', f);
+    const pl = f === 0 ? null : stat(b, 'plateMeanMin', f);
     const u = f === 0 ? null : stat(b, 'peakUtilization', f);
     const t = f === 0 ? null : stat(b, 'peakThroughputPerHour', f);
-    const base = stat(b, 'walkAwayPct', 1);
     return {
       f,
-      walkPct: f === 0 ? base.meanB! : w!.meanA!,
-      walkPeople: runMean(f, (r) => r.metrics.walkAways),
-      e2sMin: f === 0 ? stat(b, 'entranceToSeatMeanMin', 1).meanB! : e!.meanA!,
+      leftPct: f === 0 ? stat(b, 'leftPct', 1).meanB! : l!.meanA!,
+      leftPeople: runMean(f, (r) => r.metrics.leftPeople),
+      plateMin: f === 0 ? stat(b, 'plateMeanMin', 1).meanB! : pl!.meanA!,
       utilPct: f === 0 ? mean(RESERVE_LEVELS.map((x) => stat(b, 'peakUtilization', x).meanB! * 100)) : u!.meanA! * 100,
       thr: f === 0 ? stat(b, 'peakThroughputPerHour', 1).meanB! : t!.meanA!,
-      walk: w && gap(w, 1, 1),
-      e2sS: e && gap(e, 60, 1),
+      left: l && gap(l, 1, 1),
+      plateS: pl && gap(pl, 60, 1),
       util: u && gap(u, 100, -1),
       thrGap: t && gap(t, 1, -1),
     };
@@ -166,6 +175,23 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     const a = perSeed(1, get), c = perSeed(0.75, get);
     return pairedStat(a.map((x, i) => (x - c[i]) * k));
   };
+
+  const seatedGap = {} as Record<ReserveLevelKey, Gap>;
+  for (const f of RESERVE_LEVELS) seatedGap[rkey(f)] = gap(stat(b, 'entranceToSeatMeanMin', f), 60, 1);
+
+  const leave = {} as Record<LevelKey, LeaveSlice>;
+  const doorSeatingShare = {} as Record<LevelKey, number>;
+  const leaveDoor = {} as Record<LevelKey, (number | null)[]>;
+  const leaveQueue = {} as Record<LevelKey, (number | null)[]>;
+  for (const f of LEVELS) {
+    const l = fd.leavers[levelKey(f)];
+    const door = l.doorQueues + l.doorSeating + l.doorBoth;
+    leave[levelKey(f)] = { doorQueues: l.doorQueues / l.arrivals, doorSeating: l.doorSeating / l.arrivals, doorBoth: l.doorBoth / l.arrivals, door: door / l.arrivals, queue: l.queue / l.arrivals, all: (door + l.queue) / l.arrivals };
+    doorSeatingShare[levelKey(f)] = door > 0 ? (l.doorSeating + l.doorBoth) / door : 0;
+    leaveDoor[levelKey(f)] = l.bins.map((x) => (x.arrivals > 0 ? x.door / x.arrivals : null));
+    leaveQueue[levelKey(f)] = l.bins.map((x) => (x.arrivals > 0 ? x.queue / x.arrivals : null));
+  }
+  const leaveBin = fd.claims.binMin;
 
   const seats = {} as Record<LevelKey, SeatSlice>;
   const reservedEmpty = {} as Record<ReserveLevelKey, number>;
@@ -180,14 +206,20 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     reservedEmpty[rkey(f)] = shareMean(f, CLAIMED, 'sharesLevel') + shareMean(f, BLOCKED, 'sharesLevel') + shareMean(f, OPEN, 'sharesLevel');
   }
 
-  const emptyBy = {} as Record<LevelKey, number[]>;
   const minutes: number[] = [];
   for (let m = 0; m <= 180; m += 5) minutes.push(m);
+  const emptyBy = {} as Record<LevelKey, number[]>;
+  const platesBy = {} as Record<LevelKey, number[]>;
+  const platesPeak = {} as Record<LevelKey, number>;
+  const splitPct = {} as Record<LevelKey, number>;
   const emptyAt1210 = {} as Record<LevelKey, number>;
   for (const f of LEVELS) {
     const series = fd.emptyTables.byLevel[levelKey(f)];
     emptyBy[levelKey(f)] = minutes.map((m) => series[m]);
     emptyAt1210[levelKey(f)] = series[70];
+    platesBy[levelKey(f)] = minutes.map((m) => fd.platesWithoutSeat.byLevel[levelKey(f)][m]);
+    platesPeak[levelKey(f)] = runMean(f, (r) => r.metrics.peakPlatesWithoutSeat);
+    splitPct[levelKey(f)] = runMean(f, (r) => r.metrics.groupsSplitPct ?? 0);
   }
   const scarce100 = runBelow(fd.emptyTables.byLevel['1'], 1.5);
   const windows = b.pairs.map((p) => p.pm.peakWindowStartMin);
@@ -200,6 +232,7 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
   const rushClaims = {} as Record<ReserveLevelKey, number>;
   const rushFallbacks = {} as Record<ReserveLevelKey, number>;
   const claimByArrival = {} as Record<ReserveLevelKey, number[]>;
+  const doorLeftReservers = {} as Record<ReserveLevelKey, number>;
   for (const f of RESERVE_LEVELS) {
     const k = rkey(f);
     claimsPerLunch[k] = runMean(f, (r) => r.metrics.claimedGroups);
@@ -209,6 +242,7 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     rushClaims[k] = fd.claims.byLevel[k].rush.claimsRush;
     rushFallbacks[k] = fd.claims.byLevel[k].rush.fallbacksRush;
     claimByArrival[k] = fd.claims.byLevel[k].bins.map((x) => (x.reserving > 0 ? x.claimed / x.reserving : NaN));
+    doorLeftReservers[k] = fd.claims.byLevel[k].doorLeftPerLunch;
   }
   const binMin = fd.claims.binMin;
   const raw50 = fd.claims.byLevel['0.5'].bins;
@@ -216,7 +250,7 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
   const mid = claimByArrival['0.5'].filter((_, i) => i * binMin >= 70 && (i + 1) * binMin <= 110);
 
   const cohortCell = (c: 'Rclaimed' | 'Rfallback' | 'N' | 'R', f: number): CohortCell | undefined => {
-    const s = b.cohortStats.find((x) => x.cohort === c && x.metric === 'walkAwayPct' && x.fraction === f);
+    const s = b.cohortStats.find((x) => x.cohort === c && x.metric === 'leftPct' && x.fraction === f);
     if (!s) return undefined;
     const lv = nonNull(s.a), bl = nonNull(s.b);
     return lv.length ? { level: mean(lv), baseline: mean(bl) } : undefined;
@@ -232,38 +266,36 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     return sum(cs.map((x) => x.people)) / sum(cs.map((x) => x.groups));
   };
 
-  const bySize = [3, 4, 5, 6].map((size) => ({
+  const bySize = [1, 2, 3, 4, 5, 6].map((size) => ({
     size,
-    pct: Object.fromEntries(LEVELS.map((f) => [levelKey(f), runMean(f, (r) => r.metrics.bySize[size - 1].walkAwayPct ?? 0)])) as Record<LevelKey, number>,
+    pct: Object.fromEntries(LEVELS.map((f) => [levelKey(f), runMean(f, (r) => r.metrics.bySize[size - 1].leftPct ?? 0)])) as Record<LevelKey, number>,
   }));
-  const walkPeopleBySize = (f: number) => [1, 2, 3, 4, 5, 6].map((s) => sum(runsAt(b, f).map((r) => Math.round((r.metrics.bySize[s - 1].people * (r.metrics.bySize[s - 1].walkAwayPct ?? 0)) / 100))));
-  const w0 = walkPeopleBySize(0), w1 = walkPeopleBySize(1);
-  const peopleBySize = [1, 2, 3, 4, 5, 6].map((s) => sum(runsAt(b, 0).map((r) => r.metrics.bySize[s - 1].people)));
-  const mix = cfg.crowd.groupMix, mixSum = sum(mix);
-  const pairWalk = LEVELS.map((f) => sum(runsAt(b, f).map((r) => Math.round((r.metrics.bySize[1].people * (r.metrics.bySize[1].walkAwayPct ?? 0)) / 200))));
-  const pairWalkTotal = sum(pairWalk);
-  const soloWalk = sum(LEVELS.map((f) => sum(runsAt(b, f).map((r) => Math.round((r.metrics.bySize[0].people * (r.metrics.bySize[0].walkAwayPct ?? 0)) / 100)))));
-  const sameTime = RESERVE_LEVELS.filter((f) => fd.claims.byLevel[rkey(f)].fallbackWalkAwayPctAtNonReserverRates !== null).map((f) => ({
-    f, actual: fd.claims.byLevel[rkey(f)].fallbackWalkAwayPct, atNonReserverRates: fd.claims.byLevel[rkey(f)].fallbackWalkAwayPctAtNonReserverRates!,
+  const sameTime = RESERVE_LEVELS.filter((f) => fd.claims.byLevel[rkey(f)].fallbackLeftPctAtNonReserverRates !== null).map((f) => ({
+    f, actual: fd.claims.byLevel[rkey(f)].fallbackLeftPct, atNonReserverRates: fd.claims.byLevel[rkey(f)].fallbackLeftPctAtNonReserverRates!,
   }));
-
-  const wa = fd.walkAways;
-  const reserveOneTable = RESERVE_LEVELS.map((f) => wa[levelKey(f)].oneTableFit / wa[levelKey(f)].groups);
 
   const shownPerLevel = CATALOG.filter((m) => m.better).length;
   const withInterval = [...b.stats, ...b.cohortStats, ...b.sizeStats].filter((s) => s.adv.halfWidth !== null).length;
 
-  const b0 = runsAt(b, 0).map((r) => r.metrics.walkAwayPct ?? 0);
-  const b50 = runsAt(b, 0.5).map((r) => r.metrics.walkAwayPct ?? 0);
+  const b0 = runsAt(b, 0).map((r) => r.metrics.leftPct ?? 0);
+  const b50 = runsAt(b, 0.5).map((r) => r.metrics.leftPct ?? 0);
   const gaps50 = b50.map((x, i) => x - b0[i]);
   const sortedB = [...b0].sort((x, y) => y - x);
-  const w75 = perSeed(0.75, (r) => r.metrics.walkAwayPct ?? 0), w100 = perSeed(1, (r) => r.metrics.walkAwayPct ?? 0);
+  const l75 = perSeed(0.75, (r) => r.metrics.leftPct ?? 0), l100 = perSeed(1, (r) => r.metrics.leftPct ?? 0);
 
   return {
     n,
     head,
-    shareAt25: { walk: ratio((r) => r.walk), util: ratio((r) => r.util), thr: ratio((r) => r.thrGap), e2s: ratio((r) => r.e2sS) },
-    topStep: { walk: step((r) => r.metrics.walkAwayPct ?? 0), thr: step((r) => r.metrics.peakThroughputPerHour), e2sS: step((r) => r.metrics.entranceToSeatMeanMin ?? 0, 60) },
+    shareAt25: { left: ratio((r) => r.left), util: ratio((r) => r.util), thr: ratio((r) => r.thrGap), plate: ratio((r) => r.plateS) },
+    topStep: { left: step((r) => r.metrics.leftPct ?? 0), thr: step((r) => r.metrics.peakThroughputPerHour), plateS: step((r) => r.metrics.plateMeanMin ?? 0, 60) },
+    seatedE2s: { b: stat(b, 'entranceToSeatMeanMin', 1).meanB!, gapS: seatedGap },
+    queueWait: { b: stat(b, 'queueWaitMeanMin', 1).meanB!, a100: stat(b, 'queueWaitMeanMin', 1).meanA! },
+    leave,
+    doorSeatingShare,
+    leaveByArrival: { binMid: fd.leavers['0'].bins.map((_, i) => i * leaveBin + leaveBin / 2), door: leaveDoor, queue: leaveQueue },
+    doorLeftReservers,
+    plates: { minutes, byLevel: platesBy, peak: platesPeak },
+    groupsSplitPct: splitPct,
     seats,
     reservedEmpty,
     blockedAfterJoiners100: fd.peakSeats['1'].blockedAfterJoiners,
@@ -292,23 +324,7 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     fallbackVsSameTime: sameTime,
     fallbackSameTimeMaxGap: Math.max(0, ...sameTime.map((x) => Math.abs(x.actual - x.atNonReserverRates))),
     bySize,
-    bigGroupsWalkShare0: (w0[4] + w0[5]) / sum(w0),
-    bigGroupsGroupShare: (mix[4] + mix[5]) / mixSum,
-    bigGroupsPeopleShare: (peopleBySize[4] + peopleBySize[5]) / sum(peopleBySize),
-    midGroupsWalkShare: { b: (w0[2] + w0[3]) / sum(w0), a100: (w1[2] + w1[3]) / sum(w1) },
-    pairWalkAways: { groups: pairWalkTotal, level: pairWalkTotal === 1 ? LEVELS[pairWalk.findIndex((x) => x === 1)] : null },
-    soloWalkAways: soloWalk,
-    walkRatio: h(1).walkPct / h(0).walkPct,
-    anatomy: {
-      totalGroups: sum(LEVELS.map((f) => wa[levelKey(f)].groups)),
-      tooFew: sum(LEVELS.map((f) => wa[levelKey(f)].tooFew)),
-      oneTable0: wa['0'].oneTableFit / wa['0'].groups,
-      oneTableReserve: minMax(reserveOneTable),
-      emptyAmongFit0: wa['0'].emptyTableAmongFit / wa['0'].oneTableFit,
-      nearestFitM0: wa['0'].nearestFitMedianM,
-      freeSeats0: wa['0'].meanFreeSeats,
-      freeSeatsReserve: minMax(RESERVE_LEVELS.map((f) => wa[levelKey(f)].meanFreeSeats)),
-    },
+    leftRatio: h(1).leftPct / h(0).leftPct,
     time: fd.time,
     fallbacks75: fallbacksPerLunch['0.75'],
     fallbacks100: fallbacksPerLunch['1'],
@@ -317,9 +333,8 @@ export function findingsModel(b: BatchResult, fd: Findings, cfg: Config): Findin
     robust: fd.robustness,
     comparisons: withInterval,
     chartIntervals: shownPerLevel * RESERVE_LEVELS.length,
-    allFourAt100: ['walkAwayPct', 'entranceToSeatMeanMin', 'peakUtilization', 'peakThroughputPerHour'].every((id) => stat(b, id, 1).wins!.W === n),
-    lunch1: { walkB: b0[0], rank: sortedB.indexOf(b0[0]) + 1, gap50: gaps50[0], meanGap50: mean(gaps50) },
-    lunches100BelowAt75: w100.filter((x, i) => x < w75[i]).length,
-    servedAfterShare: sum(b.runs.map((r) => r.metrics.walkAwayServedAfterDecision)) / sum(b.runs.map((r) => r.metrics.walkAways)),
+    allFourAt100: ['leftPct', 'plateMeanMin', 'peakUtilization', 'peakThroughputPerHour'].every((id) => stat(b, id, 1).wins!.W === n),
+    lunch1: { leftB: b0[0], rank: sortedB.indexOf(b0[0]) + 1, gap50: gaps50[0], meanGap50: mean(gaps50) },
+    lunches100BelowAt75: l100.filter((x, i) => x < l75[i]).length,
   };
 }

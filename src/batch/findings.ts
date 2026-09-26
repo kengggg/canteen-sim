@@ -5,12 +5,12 @@ import { validate } from '../config/validate';
 import { Sim } from '../sim/engine';
 import { MINUTE_MS, quantile } from '../sim/metrics';
 import { pairMetrics } from '../sim/pairmetrics';
-import { popcount, SEAT } from '../sim/seating';
+import { SEAT } from '../sim/seating';
 import { MODEL_VERSION } from '../sim/version';
 import type { World } from '../sim/world';
 import {
   evidenceDigest, LEVEL_KEYS, RESERVE_LEVEL_KEYS,
-  type ClaimLevel, type FindingStat, type Findings, type LevelKey, type PeakSplit, type ReserveLevelKey, type RobustRow, type TimeSplit, type WalkAwayAnatomy,
+  type ClaimLevel, type FindingStat, type Findings, type LevelKey, type PeakSplit, type ReserveLevelKey, type RobustRow, type TimeSplit, type LeaverAnatomy,
 } from './findings-data';
 import type { Evidence } from './precompute';
 import { aggregate, runJob, type RunResult } from './runner';
@@ -38,19 +38,6 @@ export const SEAT_CATS = ['claimedEmptyBeyondSize', 'claimedEmptyWaiting', 'bloc
 const CE_BEYOND = 0, CE_WAITING = 1, BL_NO_JOINERS = 2, BL_AFTER_JOINERS = 3, HELD_NO_FOOD = 4;
 const NCAT = SEAT_CATS.length;
 
-/** One walk-away group, classified at its decision ms (the 'walkaway' trace fires before any seat changes). */
-export interface WalkAwayRecord {
-  size: number;
-  /** 0 oneTableFit, 1 scatteredOnly, 2 tooFew. */
-  cls: 0 | 1 | 2;
-  /** Seats in state free at the decision. */
-  freeSeats: number;
-  /** A completely empty table was among the fitting tables. */
-  emptyFit: boolean;
-  /** Route distance (mm) from the searcher's node to the nearest free seat at a fitting table; −1 if not oneTableFit or unknown. */
-  nearestFitMm: number;
-}
-
 /** Everything one instrumented run yields. */
 export interface CollectedRun {
   job: Job;
@@ -60,64 +47,37 @@ export interface CollectedRun {
   emptyTables: Int32Array;
   /** minute·SEAT_CATS.length + category: seat-ms per minute (same minutes as the seat clock's bins). */
   seatCatBins: Float64Array;
+  /** People holding food with no seat found or kept for them, at each whole minute 0…EMPTY_TABLE_MINUTES. */
+  platesWithoutSeat: Int32Array;
   groups: {
     arrivalMs: Float64Array;
     size: Uint8Array;
     reserver: Uint8Array;
     claimed: Uint8Array;
     fallback: Uint8Array;
-    walked: Uint8Array;
+    /** Members who left without eating. */
+    left: Uint8Array;
+    /** 1 if the group turned round at the door. */
+    door: Uint8Array;
     /** Claim or fallback ms − arrival ms (reserving groups), else −1. */
     claimSearchMs: Float64Array;
     /** Fallback reason from the trace (1 no target at the cutoff, 2/3 frozen target taken), 0 if none. */
     reason: Uint8Array;
   };
-  walkAways: WalkAwayRecord[];
   people: {
     entranceMs: Float64Array;
     joinMs: Float64Array;
     serviceStartMs: Float64Array;
     serviceEndMs: Float64Array;
-    /** Sit start, or the group's walk-away decision; −1 when neither. */
+    /** Sit start; −1 for people who left without eating. */
     outcomeMs: Float64Array;
+    /** How the person left (sim types LEFT), 0 if they ate. */
+    leftKind: Uint8Array;
     /** The member who did the claim search in a group that fell back. */
     fallbackClaimer: Uint8Array;
   };
   /** Highest share of stall-time spent serving in any whole-minute 30-minute window (0…1). */
   stallBusyPeak: number;
-}
-
-/** The node a person stands at, or the node it is walking toward on an edge; −1 inside the queue area. */
-function nodeOf(w: World, p: number): number {
-  const n = w.mv.node[p];
-  if (n >= 0) return n;
-  const e = w.mv.edge[p];
-  if (e < 0) return -1;
-  const ed = w.pc.G.edges[e];
-  return w.mv.dir[p] > 0 ? ed.b : ed.a;
-}
-
-function classifyWalkAway(w: World, g: number): WalkAwayRecord {
-  const G = w.groups[g];
-  const n = G.size;
-  const k2 = w.k2;
-  const node = G.searcher >= 0 ? nodeOf(w, G.searcher) : -1;
-  let fit = false, emptyFit = false, near = -1;
-  for (let t = 0; t < w.pc.tableCount; t++) {
-    if (w.claimedBy[t] >= 0) continue;
-    const free = w.freeMaskOf(t);
-    if (popcount(free) < n) continue;
-    fit = true;
-    if (w.occMask[t] === 0 && w.heldMask[t] === 0) emptyFit = true;
-    if (node < 0) continue;
-    for (let j = 0; j < k2; j++) {
-      if (((free >>> j) & 1) === 0) continue;
-      const d = w.pc.R.dist(node, w.pc.G.seatNode[t * k2 + j]);
-      if (near < 0 || d < near) near = d;
-    }
-  }
-  const freeSeats = w.clock.totals[SEAT.FREE];
-  return { size: n, cls: fit ? 0 : freeSeats >= n ? 1 : 2, freeSeats, emptyFit, nearestFitMm: fit ? near : -1 };
 }
 
 /** Current seat counts per SEAT_CATS category. */
@@ -178,19 +138,15 @@ function stallBusyPeak(w: World): number {
 
 /** Run one job to done with read-only instrumentation. */
 export function collectRun(job: Job): CollectedRun {
-  const walkAways: WalkAwayRecord[] = [];
   const reasons = new Map<number, number>();
-  let w: World | null = null;
   const sim = new Sim(job.cfg, {
     seed: job.seed,
     reserveFraction: job.fraction,
     trace: (ev, a, b) => {
       if (ev === 'fallback') reasons.set(a, b);
-      else if (ev === 'walkaway') walkAways.push(classifyWalkAway(w!, a));
     },
   });
-  w = sim.world;
-  const world = w;
+  const world = sim.world;
 
   // Integrate the categories over exactly the intervals the seat clock integrates (state is constant inside each).
   const clock = world.clock;
@@ -211,27 +167,31 @@ export function collectRun(job: Job): CollectedRun {
   };
 
   const emptyTables = new Int32Array(EMPTY_TABLE_MINUTES + 1);
+  const platesWithoutSeat = new Int32Array(EMPTY_TABLE_MINUTES + 1);
   for (let m = 0; m <= EMPTY_TABLE_MINUTES; m++) {
     sim.advanceTo(m * MINUTE_MS);
     let empty = 0;
     for (let t = 0; t < world.pc.tableCount; t++) if (world.occMask[t] === 0 && world.heldMask[t] === 0 && world.claimedBy[t] < 0) empty++;
     emptyTables[m] = empty;
+    platesWithoutSeat[m] = world.platesNoSeat;
   }
   sim.advanceTo(Infinity);
 
   const G = world.groups.length;
   const groups: CollectedRun['groups'] = {
     arrivalMs: new Float64Array(G), size: new Uint8Array(G), reserver: new Uint8Array(G), claimed: new Uint8Array(G), fallback: new Uint8Array(G),
-    walked: new Uint8Array(G), claimSearchMs: new Float64Array(G).fill(-1), reason: new Uint8Array(G),
+    left: new Uint8Array(G), door: new Uint8Array(G), claimSearchMs: new Float64Array(G).fill(-1), reason: new Uint8Array(G),
   };
   for (let g = 0; g < G; g++) {
     const gs = world.groups[g];
-    groups.arrivalMs[g] = world.entranceMs[gs.first];
-    groups.size[g] = gs.size;
+    const first = world.pop.firstPerson[g], size = world.pop.size[g];
+    groups.arrivalMs[g] = world.entranceMs[first];
+    groups.size[g] = size;
     groups.reserver[g] = gs.reserver ? 1 : 0;
     groups.claimed[g] = gs.claimed ? 1 : 0;
     groups.fallback[g] = gs.fallback ? 1 : 0;
-    groups.walked[g] = gs.walkedAway ? 1 : 0;
+    for (let p = first; p < first + size; p++) if (world.leftKind[p] !== 0) groups.left[g]++;
+    groups.door[g] = world.leftKind[first] >= 1 && world.leftKind[first] <= 3 ? 1 : 0;
     if (gs.reserver && gs.claimEndMs >= 0) groups.claimSearchMs[g] = gs.claimEndMs - gs.arrivalMs;
     groups.reason[g] = reasons.get(g) ?? 0;
   }
@@ -239,9 +199,8 @@ export function collectRun(job: Job): CollectedRun {
   const outcomeMs = new Float64Array(P).fill(-1);
   const fallbackClaimer = new Uint8Array(P);
   for (let p = 0; p < P; p++) {
-    const gs = world.groupOf(p);
-    const sit = world.sitStartMs[p];
-    outcomeMs[p] = sit >= 0 ? sit : gs.walkedAway ? gs.walkAwayMs : -1;
+    const gs = world.originOf(p);
+    outcomeMs[p] = world.sitStartMs[p];
     fallbackClaimer[p] = gs.reserver && gs.fallback && gs.claimer === p ? 1 : 0;
   }
   const result: RunResult = {
@@ -249,10 +208,10 @@ export function collectRun(job: Job): CollectedRun {
     metrics: sim.metrics(), hash: sim.runHash(), pair: sim.pairInput(), shareMinEmpty: job.cfg.reserve.shareMinEmpty,
   };
   return {
-    job, result, emptyTables, seatCatBins, groups, walkAways,
+    job, result, emptyTables, seatCatBins, platesWithoutSeat, groups,
     people: {
       entranceMs: world.entranceMs.slice(), joinMs: world.st.joinMs.slice(), serviceStartMs: world.st.serviceStartMs.slice(),
-      serviceEndMs: world.st.serviceEndMs.slice(), outcomeMs, fallbackClaimer,
+      serviceEndMs: world.st.serviceEndMs.slice(), outcomeMs, leftKind: world.leftKind.slice(), fallbackClaimer,
     },
     stallBusyPeak: stallBusyPeak(world),
   };
@@ -274,16 +233,16 @@ class ClaimAcc {
   private fallbackSearch: number[] = [];
   private claimsBefore = 0; private claimsRush = 0; private claimsAfter = 0; private fallbacksRush = 0;
   private reason1 = 0; private fallbacks = 0;
-  private fbPeople = 0; private fbWalked = 0;
+  private fbPeople = 0; private fbLeft = 0; private doorLeft = 0;
   private readonly fbPeopleBin: number[];
   private readonly nonPeopleBin: number[];
-  private readonly nonWalkedBin: number[];
+  private readonly nonLeftBin: number[];
 
   constructor(private readonly n: number, nBins: number) {
     this.bins = Array.from({ length: nBins }, () => ({ reserving: 0, claimed: 0 }));
     this.fbPeopleBin = new Array(nBins).fill(0);
     this.nonPeopleBin = new Array(nBins).fill(0);
-    this.nonWalkedBin = new Array(nBins).fill(0);
+    this.nonLeftBin = new Array(nBins).fill(0);
   }
 
   add(r: CollectedRun): void {
@@ -295,10 +254,11 @@ class ClaimAcc {
       const rush = min >= RUSH_FROM_MIN && min < RUSH_TO_MIN;
       if (!g.reserver[i]) {
         this.nonPeopleBin[b] += g.size[i];
-        if (g.walked[i]) this.nonWalkedBin[b] += g.size[i];
+        this.nonLeftBin[b] += g.left[i];
         continue;
       }
       this.bins[b].reserving++;
+      if (g.door[i]) this.doorLeft++;
       if (g.claimed[i]) {
         this.bins[b].claimed++;
         this.claimedArr.push(arr);
@@ -314,7 +274,7 @@ class ClaimAcc {
         if (g.reason[i] === 1) this.reason1++;
         this.fbPeople += g.size[i];
         this.fbPeopleBin[b] += g.size[i];
-        if (g.walked[i]) this.fbWalked += g.size[i];
+        this.fbLeft += g.left[i];
       }
     }
   }
@@ -323,7 +283,7 @@ class ClaimAcc {
     let exp = 0, tot = 0;
     for (let b = 0; b < this.bins.length; b++) {
       if (this.fbPeopleBin[b] === 0 || this.nonPeopleBin[b] === 0) continue;
-      exp += (this.fbPeopleBin[b] * this.nonWalkedBin[b]) / this.nonPeopleBin[b];
+      exp += (this.fbPeopleBin[b] * this.nonLeftBin[b]) / this.nonPeopleBin[b];
       tot += this.fbPeopleBin[b];
     }
     const n = this.n;
@@ -333,24 +293,40 @@ class ClaimAcc {
       claimSearchMedianS: { claimed: median(this.claimedSearch) / 1000, fallback: median(this.fallbackSearch) / 1000 },
       medianArrivalMin: { claimed: median(this.claimedArr) / MINUTE_MS, fallback: median(this.fallbackArr) / MINUTE_MS },
       fallbackNoTargetShare: this.reason1 / this.fallbacks,
-      fallbackWalkAwayPct: (100 * this.fbWalked) / this.fbPeople,
-      fallbackWalkAwayPctAtNonReserverRates: tot > 0 ? (100 * exp) / tot : null,
+      fallbackLeftPct: (100 * this.fbLeft) / this.fbPeople,
+      fallbackLeftPctAtNonReserverRates: tot > 0 ? (100 * exp) / tot : null,
+      doorLeftPerLunch: this.doorLeft / n,
     };
   }
 }
 
-function walkAwayFigures(recs: WalkAwayRecord[]): WalkAwayAnatomy {
-  const fit = recs.filter((r) => r.cls === 0);
-  const dists = fit.filter((r) => r.nearestFitMm >= 0).map((r) => r.nearestFitMm);
-  return {
-    groups: recs.length,
-    oneTableFit: fit.length,
-    scatteredOnly: recs.filter((r) => r.cls === 1).length,
-    tooFew: recs.filter((r) => r.cls === 2).length,
-    meanFreeSeats: mean(recs.map((r) => r.freeSeats)),
-    emptyTableAmongFit: fit.filter((r) => r.emptyFit).length,
-    nearestFitMedianM: dists.length > 0 ? median(dists) / 1000 : null,
-  };
+class LeaverAcc {
+  private readonly a: LeaverAnatomy;
+  constructor(nBins: number) {
+    this.a = { arrivals: 0, doorQueues: 0, doorSeating: 0, doorBoth: 0, queue: 0, bins: Array.from({ length: nBins }, () => ({ arrivals: 0, door: 0, queue: 0 })) };
+  }
+
+  add(r: CollectedRun): void {
+    const q = r.people;
+    const nb = this.a.bins.length;
+    for (let p = 0; p < q.entranceMs.length; p++) {
+      if (q.entranceMs[p] < 0) continue;
+      const bin = this.a.bins[Math.min(nb - 1, Math.floor(q.entranceMs[p] / (CLAIM_BIN_MIN * MINUTE_MS)))];
+      this.a.arrivals++;
+      bin.arrivals++;
+      const k = q.leftKind[p];
+      if (k === 1) this.a.doorQueues++;
+      else if (k === 2) this.a.doorSeating++;
+      else if (k === 3) this.a.doorBoth++;
+      else if (k === 4) this.a.queue++;
+      if (k >= 1 && k <= 3) bin.door++;
+      else if (k === 4) bin.queue++;
+    }
+  }
+
+  figures(): LeaverAnatomy {
+    return this.a;
+  }
 }
 
 /** Peak-window shares of one pair (level run against its 0% run): fractions of all seat-time in the pair's window. */
@@ -371,28 +347,28 @@ export function peakSplitOfPair(level: CollectedRun, base: CollectedRun): PeakSp
   };
 }
 
-/** Per-person parts of the trip (ms), or null when a timestamp is missing. */
-function tripParts(r: CollectedRun, p: number): [toQueue: number, queueAndService: number, afterService: number, queueWait: number, withoutCutoff: number] | null {
+/** Per-person parts of the trip (ms) for someone who ate, or null for someone who left without eating. */
+function tripParts(r: CollectedRun, p: number): [toQueue: number, queueAndService: number, afterService: number, queueWait: number] | null {
   const q = r.people;
   const ent = q.entranceMs[p], join = q.joinMs[p], ss = q.serviceStartMs[p], se = q.serviceEndMs[p], out = q.outcomeMs[p];
   if (ent < 0 || join < 0 || ss < 0 || se < 0 || out < 0) return null;
-  return [join - ent, se - join, out - se, ss - join, Math.max(out, se) - ent];
+  return [join - ent, se - join, out - se, ss - join];
 }
 
 class TimeAcc {
-  private perLunch: number[][] = [[], [], [], [], []];
+  private perLunch: number[][] = [[], [], [], []];
   private sumAll = 0; private nAll = 0; private sumFc = 0; private nFc = 0;
 
   add(level: CollectedRun, base: CollectedRun): void {
-    const s = [0, 0, 0, 0, 0];
+    const s = [0, 0, 0, 0];
     let n = 0;
     const P = level.people.entranceMs.length;
     for (let p = 0; p < P; p++) {
       const a = tripParts(level, p), b = tripParts(base, p);
       if (!a || !b) continue;
-      const d = [a[0] - b[0], a[1] - b[1], a[2] - b[2], 0, a[4] - b[4]];
+      const d = [a[0] - b[0], a[1] - b[1], a[2] - b[2], 0];
       d[3] = d[0] + d[1] + d[2];
-      for (let k = 0; k < 5; k++) s[k] += d[k];
+      for (let k = 0; k < 4; k++) s[k] += d[k];
       n++;
       this.sumAll += d[3];
       this.nAll++;
@@ -401,7 +377,7 @@ class TimeAcc {
         this.nFc++;
       }
     }
-    for (let k = 0; k < 5; k++) this.perLunch[k].push(s[k] / n);
+    for (let k = 0; k < 4; k++) this.perLunch[k].push(s[k] / n);
   }
 
   figures(): TimeSplit {
@@ -411,7 +387,6 @@ class TimeAcc {
       queueAndServiceS: sec(1),
       afterServiceS: sec(2),
       totalS: sec(3),
-      totalWithoutCutoffS: sec(4),
       fallbackClaimerShare: this.sumFc / this.sumAll,
       fallbackClaimerPersonS: this.sumFc / this.nFc / 1000,
       fallbackClaimerPeopleShare: this.nFc / this.nAll,
@@ -421,7 +396,8 @@ class TimeAcc {
 
 export interface LevelFigures {
   emptyTables: number[];
-  walkAways: WalkAwayAnatomy;
+  platesWithoutSeat: number[];
+  leavers: LeaverAnatomy;
   /** Null at 0%. */
   claims: ClaimLevel | null;
   peakSeats: PeakSplit | null;
@@ -461,7 +437,8 @@ export function sweepFigures(cfg: Config, n: number, fractions: number[], onProg
   const acc = fractions.map((f) => ({
     f,
     empty: new Float64Array(EMPTY_TABLE_MINUTES + 1),
-    walk: [] as WalkAwayRecord[],
+    plates: new Float64Array(EMPTY_TABLE_MINUTES + 1),
+    leavers: new LeaverAcc(nBins),
     claims: f > 0 ? new ClaimAcc(n, nBins) : null,
     peak: [] as PeakSplit[],
     time: f > 0 ? new TimeAcc() : null,
@@ -486,8 +463,11 @@ export function sweepFigures(cfg: Config, n: number, fractions: number[], onProg
       const r = li === 0 ? base : collectRun(jobs[li * n + i]);
       results.push(r.result);
       const a = acc[li];
-      for (let m = 0; m <= EMPTY_TABLE_MINUTES; m++) a.empty[m] += r.emptyTables[m];
-      a.walk.push(...r.walkAways);
+      for (let m = 0; m <= EMPTY_TABLE_MINUTES; m++) {
+        a.empty[m] += r.emptyTables[m];
+        a.plates[m] += r.platesWithoutSeat[m];
+      }
+      a.leavers.add(r);
       if (li === 0) continue;
       a.claims!.add(r);
       a.peak.push(peakSplitOfPair(r, base));
@@ -502,7 +482,8 @@ export function sweepFigures(cfg: Config, n: number, fractions: number[], onProg
     ) as unknown as PeakSplit);
     levels[String(a.f)] = {
       emptyTables: Array.from(a.empty, (x) => x / n),
-      walkAways: walkAwayFigures(a.walk),
+      platesWithoutSeat: Array.from(a.plates, (x) => x / n),
+      leavers: a.leavers.figures(),
       claims: a.claims ? a.claims.figures() : null,
       peakSeats: a.f > 0 ? peak : null,
       time: a.time ? a.time.figures() : null,
@@ -526,14 +507,17 @@ const withSetting = (id: string, v: number | boolean) => () => {
   return c;
 };
 
-/** Robustness rows (spec §10.9): the defaults, then eight other settings, in display order. */
+/** Robustness rows (spec §10.9, design §6.3): the defaults, then eleven other settings, in display order. */
 export const VARIANTS: Variant[] = [
   { id: 'default', label: 'Default (1,800 people)', make: defaultConfig },
   { id: 'quiet', label: 'Quiet day (800 people)', make: () => presetConfig('quiet') },
   { id: 'people1200', label: '1,200 people', make: withSetting('crowd.totalPeople', 1200) },
   { id: 'crush', label: 'Crush (2,600 people, 75% in the rush)', make: () => presetConfig('crush') },
   { id: 'reservationFriendly', label: 'Reservation-friendly settings', make: () => presetConfig('reservationFriendly') },
-  { id: 'patience600', label: 'Searcher gives up after 10 minutes (default 5)', make: withSetting('search.patience', 600) },
+  { id: 'wait900', label: 'Patient crowd (wait limit 15 min, default 10)', make: withSetting('leave.waitMean', 900) },
+  { id: 'wait300', label: 'Impatient crowd (wait limit 5 min)', make: withSetting('leave.waitMean', 300) },
+  { id: 'split300', label: 'Groups split after 5 minutes of circling (default 2)', make: withSetting('search.splitAfter', 300) },
+  { id: 'queuesOnly', label: 'Queues only at the door (no seating check)', make: withSetting('leave.roomNeeded', 0) },
   { id: 'noSharing', label: 'Reserved tables never shared', make: withSetting('reserve.shareMinEmpty', 6) },
   { id: 'service60', label: 'Faster stalls (60 s per person, default 90)', make: withSetting('stalls.serviceMean', 60) },
   { id: 'parallel', label: 'All groupmates with food search at once', make: withSetting('search.parallel', true) },
@@ -565,32 +549,26 @@ export function robustRow(v: Variant, results: RunResult[]): RobustRow {
   const jobs = sweepJobs(cfg, n, [0, 1]);
   const b = aggregate('reservation', jobs, results);
   const byKey = new Map(results.map((r) => [r.key, r]));
-  let seatedSum = 0, seatedN = 0, walkedSum = 0, walkedN = 0;
+  let seatedSum = 0, seatedN = 0;
   for (let i = 0; i < n; i++) {
     const A = byKey.get(`-|1|${i}`), B = byKey.get(`-|0|${i}`);
     if (!A || !B || A.metrics.truncated || B.metrics.truncated) continue;
     const a = A.pair, z = B.pair;
     for (let p = 0; p < a.e2sMs.length; p++) {
       if (a.e2sMs[p] < 0 || z.e2sMs[p] < 0) continue;
-      if (!a.walkedAway[p] && !z.walkedAway[p]) {
-        seatedSum += a.e2sMs[p] - z.e2sMs[p];
-        seatedN++;
-      } else if (a.walkedAway[p] && z.walkedAway[p]) {
-        walkedSum += a.e2sMs[p] - z.e2sMs[p];
-        walkedN++;
-      }
+      seatedSum += a.e2sMs[p] - z.e2sMs[p];
+      seatedN++;
     }
   }
   return {
     id: v.id,
     label: v.label,
     changes: settingChanges(cfg),
-    walkAway: findingStat(b.stats, 'walkAwayPct'),
-    e2sMin: findingStat(b.stats, 'entranceToSeatMeanMin'),
+    left: findingStat(b.stats, 'leftPct'),
+    plate: findingStat(b.stats, 'plateMeanMin'),
     peakUtilPct: findingStat(b.stats, 'peakUtilization', 100),
     peakThroughput: findingStat(b.stats, 'peakThroughputPerHour'),
     seatedE2sDeltaMin: seatedSum / seatedN / MINUTE_MS,
-    walkAwayE2sDeltaMin: walkedN > 0 ? walkedSum / walkedN / MINUTE_MS : null,
   };
 }
 
@@ -648,14 +626,15 @@ export function computeFindings(opts: { n?: number; onProgress?: (msg: string) =
   const level = (k: LevelKey) => sweep.levels[k];
   const perLevel = <T>(keys: LevelKey[], get: (l: LevelFigures) => T) => Object.fromEntries(keys.map((k) => [k, get(level(k))]));
   return tidy({
-    v: 1,
+    v: 2,
     model: MODEL_VERSION,
     evidenceDigest: opts.evidence ? evidenceDigest(opts.evidence) : 0,
     n,
     emptyTables: { stepMin: 1, byLevel: perLevel(LEVEL_KEYS, (l) => l.emptyTables) as Record<LevelKey, number[]> },
     claims: { binMin: CLAIM_BIN_MIN as 10, byLevel: perLevel(RESERVE_LEVEL_KEYS, (l) => l.claims!) as Record<ReserveLevelKey, ClaimLevel> },
     peakSeats: perLevel(RESERVE_LEVEL_KEYS, (l) => l.peakSeats!) as Record<ReserveLevelKey, PeakSplit>,
-    walkAways: perLevel(LEVEL_KEYS, (l) => l.walkAways) as Record<LevelKey, WalkAwayAnatomy>,
+    leavers: perLevel(LEVEL_KEYS, (l) => l.leavers) as Record<LevelKey, LeaverAnatomy>,
+    platesWithoutSeat: { stepMin: 1, byLevel: perLevel(LEVEL_KEYS, (l) => l.platesWithoutSeat) as Record<LevelKey, number[]> },
     time: {
       baseline: sweep.baseline,
       byLevel: perLevel(RESERVE_LEVEL_KEYS, (l) => l.time!) as Record<ReserveLevelKey, TimeSplit>,

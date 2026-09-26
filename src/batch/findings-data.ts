@@ -39,10 +39,12 @@ export interface ClaimLevel {
   medianArrivalMin: { claimed: number; fallback: number };
   /** Share of fallbacks with no empty table to head for when the claim limit passed (fallback reason 1). */
   fallbackNoTargetShare: number;
-  /** Walk-away % of the people in fallback groups. */
-  fallbackWalkAwayPct: number;
-  /** The same, if each fallback person had the walk-away rate of non-reservers arriving in the same bin; null at 100%. */
-  fallbackWalkAwayPctAtNonReserverRates: number | null;
+  /** Left-without-eating % of the people in fallback groups. */
+  fallbackLeftPct: number;
+  /** The same, if each fallback person had the leaving rate of non-reservers arriving in the same bin; null at 100%. */
+  fallbackLeftPctAtNonReserverRates: number | null;
+  /** Reserving groups per lunch that turned round at the door before trying to claim. */
+  doorLeftPerLunch: number;
 }
 
 /** Busiest-hour seat-time shares (fractions of all seat-time in the pair's peak window) split finer than the §7.1 states. */
@@ -59,20 +61,17 @@ export interface PeakSplit {
   baselineHeldNoFood: number;
 }
 
-/** Walk-away groups classified at the moment each gave up (totals over all lunches). */
-export interface WalkAwayAnatomy {
-  groups: number;
-  /** Some unclaimed table had at least as many free seats (neither occupied nor held) as the group had people. */
-  oneTableFit: number;
-  /** Not oneTableFit, but the canteen had at least that many seats in state free in total. */
-  scatteredOnly: number;
-  tooFew: number;
-  /** Mean number of seats in state free at the decision moments. */
-  meanFreeSeats: number;
-  /** oneTableFit groups for which a completely empty table was among the fitting tables. */
-  emptyTableAmongFit: number;
-  /** Median walking distance (m) from the searcher's next node to the nearest fitting table, over oneTableFit groups; null if not computed. */
-  nearestFitMedianM: number | null;
+/** People who left without eating at one level, by where and why (totals over all lunches, design §6.3). */
+export interface LeaverAnatomy {
+  arrivals: number;
+  /** Turned round at the door: even the shortest queue looked too long; too few tables looked free; both. */
+  doorQueues: number;
+  doorSeating: number;
+  doorBoth: number;
+  /** Gave up in a queue after waiting past the group's limit. */
+  queue: number;
+  /** By 10-minute arrival bin (bin i starts at minute 10i): arrivals, door leavers and queue leavers. */
+  bins: { arrivals: number; door: number; queue: number }[];
 }
 
 /**
@@ -84,11 +83,9 @@ export interface TimeSplit {
   toQueueS: number;
   /** Joining a queue to service end (queue wait plus service; service time is identical per person). */
   queueAndServiceS: number;
-  /** Service end to sitting down, or to the group's walk-away decision (negative for a member whose group gave up first). */
+  /** Service end to sitting down: the time carrying a plate. */
   afterServiceS: number;
   totalS: number;
-  /** totalS with each member's time counted at least until their own service end. */
-  totalWithoutCutoffS: number;
   /** Share of the all-people change contributed by claimers of groups that fell back. */
   fallbackClaimerShare: number;
   /** Mean change for one such claimer. */
@@ -102,19 +99,19 @@ export interface RobustRow {
   label: string;
   /** Human-readable setting changes against the defaults, e.g. 'crowd.totalPeople 1800 → 800'. */
   changes: string[];
-  walkAway: FindingStat;
-  e2sMin: FindingStat;
+  /** P1: left without eating, %. */
+  left: FindingStat;
+  /** P2: time carrying a plate, minutes. */
+  plate: FindingStat;
   /** Peak utilization in % (P3 × 100). */
   peakUtilPct: FindingStat;
   peakThroughput: FindingStat;
   /** Mean change (min) in entrance-to-seat for people seated in both runs, 100% minus 0%, pooled over all lunches. */
   seatedE2sDeltaMin: number;
-  /** Mean change (min) in entrance-to-give-up for people who walked away in both runs, pooled; null if none did. */
-  walkAwayE2sDeltaMin: number | null;
 }
 
 export interface Findings {
-  v: 1;
+  v: 2;
   model: number;
   /** evidenceDigest() of the evidence these figures were computed against. */
   evidenceDigest: number;
@@ -124,7 +121,9 @@ export interface Findings {
   emptyTables: { stepMin: 1; byLevel: Record<LevelKey, number[]> };
   claims: { binMin: 10; byLevel: Record<ReserveLevelKey, ClaimLevel> };
   peakSeats: Record<ReserveLevelKey, PeakSplit>;
-  walkAways: Record<LevelKey, WalkAwayAnatomy>;
+  leavers: Record<LevelKey, LeaverAnatomy>;
+  /** Mean number of people holding food with no seat found or kept for them, at each minute 0…200. */
+  platesWithoutSeat: { stepMin: 1; byLevel: Record<LevelKey, number[]> };
   time: {
     /** Mean seconds per person at 0%: entrance → queue, queue join → service end, service end → outcome, and queue wait alone. */
     baseline: { toQueueS: number; queueAndServiceS: number; afterServiceS: number; queueWaitS: number };

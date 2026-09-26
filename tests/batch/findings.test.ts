@@ -26,6 +26,7 @@ test('the shipped findings are current: model version and evidence digest', () =
   expect(findings.n, stale).toBe(evidence.n);
   expect(Object.keys(findings.emptyTables.byLevel).sort()).toEqual([...LEVEL_KEYS].sort());
   for (const k of LEVEL_KEYS) expect(findings.emptyTables.byLevel[k]).toHaveLength(EMPTY_TABLE_MINUTES + 1);
+  for (const k of LEVEL_KEYS) expect(findings.platesWithoutSeat.byLevel[k]).toHaveLength(EMPTY_TABLE_MINUTES + 1);
 });
 
 describe('the shipped findings agree with the shipped evidence', () => {
@@ -43,12 +44,17 @@ describe('the shipped findings agree with the shipped evidence', () => {
     }
   });
 
-  test('walk-away groups and split-feasible walk-aways', () => {
+  test('people who left without eating, by where and why, match the evidence counts', () => {
     for (const k of LEVEL_KEYS) {
-      const w = findings.walkAways[k], m = metricsAt(Number(k));
-      expect(w.groups).toBe(sum(m.map((x) => x.walkAwayGroups)));
-      expect(w.oneTableFit + w.scatteredOnly).toBe(sum(m.map((x) => x.splitFeasibleGroups)));
-      expect(w.oneTableFit + w.scatteredOnly + w.tooFew).toBe(w.groups);
+      const l = findings.leavers[k], m = metricsAt(Number(k));
+      expect(l.arrivals).toBe(sum(m.map((x) => x.arrivals)));
+      expect(l.doorQueues).toBe(sum(m.map((x) => x.leftDoorQueues)));
+      expect(l.doorSeating).toBe(sum(m.map((x) => x.leftDoorSeating)));
+      expect(l.doorBoth).toBe(sum(m.map((x) => x.leftDoorBoth)));
+      expect(l.queue).toBe(sum(m.map((x) => x.leftQueue)));
+      expect(sum(l.bins.map((b) => b.arrivals))).toBe(l.arrivals);
+      expect(sum(l.bins.map((b) => b.door))).toBe(l.doorQueues + l.doorSeating + l.doorBoth);
+      expect(sum(l.bins.map((b) => b.queue))).toBe(l.queue);
     }
   });
 
@@ -61,24 +67,23 @@ describe('the shipped findings agree with the shipped evidence', () => {
     }
   });
 
-  test('time: totals, the queue part and the baseline trip match the evidence', () => {
+  test('time: the parts add up, and the baseline trip matches the evidence', () => {
+    // The level parts pair each person who ate in both runs, so they have no evidence counterpart (people who leave
+    // differ between the runs); the baseline trip is over everyone who ate, like the evidence means.
     for (const k of RESERVE_LEVEL_KEYS) {
       const t = findings.time.byLevel[k];
-      near(t.totalS, stat('entranceToSeatMeanMin', Number(k)).adv.mean! * 60, 5e-4);
       near(t.toQueueS + t.queueAndServiceS + t.afterServiceS, t.totalS, 1e-4);
-      // Service time is fixed per person, so the queue-and-service change is the queue-wait change.
-      near(t.queueAndServiceS, stat('queueWaitMeanMin', Number(k)).adv.mean! * 60, 1e-4);
     }
     const b = findings.time.baseline;
     near(b.queueWaitS, mean(metricsAt(0).map((x) => x.queueWaitMeanMin!)) * 60, 1e-4);
     near(b.toQueueS + b.queueAndServiceS + b.afterServiceS, mean(metricsAt(0).map((x) => x.entranceToSeatMeanMin!)) * 60, 1e-4);
   });
 
-  test('fallback walk-away % is the pooled walk-away % of the evidence cohort of reservers who found no table', () => {
+  test('fallback left % is the pooled left % of the evidence cohort of reservers who found no table', () => {
     for (const k of RESERVE_LEVEL_KEYS) {
       const cs = pairsAt(Number(k)).map((p) => p.cohorts.Rfallback.level);
-      const pooled = sum(cs.map((c) => c.people * (c.walkAwayPct ?? 0))) / sum(cs.map((c) => c.people));
-      near(findings.claims.byLevel[k].fallbackWalkAwayPct, pooled, 1e-5);
+      const pooled = sum(cs.map((c) => c.people * (c.leftPct ?? 0))) / sum(cs.map((c) => c.people));
+      near(findings.claims.byLevel[k].fallbackLeftPct, pooled, 1e-5);
     }
   });
 
@@ -91,8 +96,8 @@ describe('the shipped findings agree with the shipped evidence', () => {
       for (const [x, y] of [[got.a, s.meanA!], [got.b, s.meanB!], [got.adv, s.adv.mean!], [got.lo, s.adv.lo!], [got.hi, s.adv.hi!]]) near(x, y * scale, 2e-5);
       expect([got.W, got.T, got.L]).toEqual([s.wins!.W, s.wins!.T, s.wins!.L]);
     };
-    check(row.walkAway, 'walkAwayPct', 1);
-    check(row.e2sMin, 'entranceToSeatMeanMin', 1);
+    check(row.left, 'leftPct', 1);
+    check(row.plate, 'plateMeanMin', 1);
     check(row.peakUtilPct, 'peakUtilization', 100);
     check(row.peakThroughput, 'peakThroughputPerHour', 1);
   });
@@ -110,7 +115,7 @@ test('the robustness rows are the VARIANTS settings, in order, with their labels
 test('instrumented runs reproduce plain runs, and their figures add up', () => {
   const c = defaultConfig();
   c.crowd.totalPeople = 300;
-  c.layout.rows = 2; // 20 tables: claims, fallbacks and all three kinds of walk-away
+  c.layout.rows = 2; // 20 tables: claims, fallbacks, splits, and leaving at the door and from queues
   const n = 2;
   const s = sweepFigures(c, n, [0, 0.5]);
   const byKey = new Map(s.results.map((r) => [r.key, r]));
@@ -128,21 +133,30 @@ test('instrumented runs reproduce plain runs, and their figures add up', () => {
   expect(sum(claims.bins.map((b) => b.claimed))).toBe(sum(at(0.5).map((r) => r.metrics.claimedGroups)));
   expect((claims.rush.claimsBefore + claims.rush.claimsRush + claims.rush.claimsAfter) * n).toBeCloseTo(sum(claims.bins.map((b) => b.claimed)), 9);
 
-  // Walk-aways: every walk-away group is classified once, and the classes agree with the engine's split-feasible flag.
+  // Leavers: every arrival counted once, and the kinds agree with the engine's counters.
   for (const f of [0, 0.5]) {
-    const w = s.levels[String(f)].walkAways;
-    expect(w.oneTableFit + w.scatteredOnly + w.tooFew).toBe(w.groups);
-    expect(w.groups).toBe(sum(at(f).map((r) => r.metrics.walkAwayGroups)));
-    expect(w.oneTableFit + w.scatteredOnly).toBe(sum(at(f).map((r) => r.metrics.splitFeasibleGroups)));
+    const l = s.levels[String(f)].leavers;
+    expect(l.arrivals).toBe(sum(at(f).map((r) => r.metrics.arrivals)));
+    expect(l.doorQueues + l.doorSeating + l.doorBoth + l.queue).toBe(sum(at(f).map((r) => r.metrics.leftPeople)));
   }
-  expect(s.levels['0'].walkAways.groups + lv.walkAways.groups).toBeGreaterThan(0);
+  expect(s.levels['0.5'].leavers.doorQueues + s.levels['0.5'].leavers.doorSeating + s.levels['0.5'].leavers.doorBoth).toBeGreaterThan(0);
 
-  // Time: the three parts add up to the total, which is the change in mean entrance-to-seat.
+  // Time: the three parts add up to the total, the mean paired change in entrance-to-seat of people who ate in both runs.
   const t = lv.time!;
   near(t.toQueueS + t.queueAndServiceS + t.afterServiceS, t.totalS, 1e-9);
-  const e2s = at(0.5).map((r, i) => (r.metrics.entranceToSeatMeanMin! - at(0)[i].metrics.entranceToSeatMeanMin!) * 60);
-  near(t.totalS, mean(e2s), 1e-9);
-  expect(t.totalWithoutCutoffS).toBeGreaterThanOrEqual(t.totalS - 1e-9);
+  const paired = at(0.5).map((r, i) => {
+    const a = r.pair.e2sMs, z = at(0)[i].pair.e2sMs;
+    let d = 0, k = 0;
+    for (let p = 0; p < a.length; p++) if (a[p] >= 0 && z[p] >= 0) { d += a[p] - z[p]; k++; }
+    return d / k / 1000;
+  });
+  near(t.totalS, mean(paired), 1e-9);
+
+  // Plates without a seat: per-minute counts never exceed the run's peak.
+  for (const f of [0, 0.5]) {
+    const peak = Math.max(...at(f).map((r) => r.metrics.peakPlatesWithoutSeat));
+    for (const x of s.levels[String(f)].platesWithoutSeat) expect(x >= 0 && x <= peak).toBe(true);
+  }
 
   // Peak split: the parts add up to the pair's own shares.
   const pms = at(0.5).map((r, i) => pairMetrics(r.pair, at(0)[i].pair, 0.5));
