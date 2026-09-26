@@ -11,10 +11,9 @@ export function install(w: World): void {
   w.onReach = onReach;
 }
 
+/** The party's active members (a live array: callers that remove members iterate over a copy). */
 function members(G: GroupState): number[] {
-  const out: number[] = [];
-  for (let m = 0; m < G.size; m++) out.push(G.first + m);
-  return out;
+  return G.people;
 }
 
 // ---------------------------------------------------------------- arrival and buying
@@ -34,7 +33,7 @@ export function groupArrive(w: World, g: number): void {
     return;
   }
   G.mode = GM.RESERVE;
-  G.claimer = G.first;
+  G.claimer = G.people[0];
   G.mem = new Memory(w.pc);
   if (w.together) {
     for (const p of members(G)) w.provisional[p] = w.st.provisional(p);
@@ -65,7 +64,7 @@ export function groupArrive(w: World, g: number): void {
       return;
     }
   }
-  w.schedule(w.now + w.claimLimitMs, K.TIMER, w.pidOf(G.first), EV.CUTOFF, g);
+  w.schedule(w.now + w.claimLimitMs, K.TIMER, w.pidOf(G.people[0]), EV.CUTOFF, G.party);
   claimObserve(w, G.claimer, entrance);
   w.trace?.('arrive', g, 0, 0);
 }
@@ -324,8 +323,8 @@ export function placeEnd(w: World, p: number): void {
   }
 }
 
-export function onCutoff(w: World, g: number): void {
-  const G = w.groups[g];
+export function onCutoff(w: World, party: number): void {
+  const G = w.parties[party];
   if (G.mode !== GM.RESERVE) return;
   G.cutoffPassed = true;
   if (G.claimTargetTable >= 0) G.frozen = true;
@@ -398,7 +397,7 @@ function makeSearcher(w: World, G: GroupState, p: number, patienceFrom: number):
   G.searcherFoodMs = w.st.serviceEndMs[p];
   G.patienceStamp++;
   w.trace?.('searcher', G.g, p, 0);
-  w.schedule(patienceFrom + w.patienceMs, K.TIMER, w.pidOf(G.first), EV.PATIENCE, G.g, G.patienceStamp);
+  w.schedule(patienceFrom + w.patienceMs, K.TIMER, w.pidOf(G.people[0]), EV.PATIENCE, G.party, G.patienceStamp);
 }
 
 /** Kind 3: back at the stall walkway stop holding food. */
@@ -572,8 +571,8 @@ function commit(w: World, G: GroupState, p: number, t: number, join: boolean): v
 
 // ---------------------------------------------------------------- walk-aways (§5.7)
 
-export function onPatience(w: World, g: number, stamp: number): void {
-  const G = w.groups[g];
+export function onPatience(w: World, party: number, stamp: number): void {
+  const G = w.parties[party];
   if (stamp !== G.patienceStamp || G.committedTable >= 0 || G.walkedAway || G.mode !== GM.FREE) return;
   if (G.pendingAsks > 0) G.walkPending = true;
   else walkAway(w, G);
@@ -644,11 +643,11 @@ export function sitEnd(w: World, p: number): void {
 export function eatEnd(w: World, p: number): void {
   const G = w.groupOf(p);
   G.eatDone++;
-  if (G.eatDone === G.size) w.schedule(w.now + w.lingerMs, K.TIMER, w.pidOf(G.first), EV.STAND_START, G.g);
+  if (G.eatDone === G.size) w.schedule(w.now + w.lingerMs, K.TIMER, w.pidOf(G.people[0]), EV.STAND_START, G.party);
 }
 
-export function standStart(w: World, g: number): void {
-  const G = w.groups[g];
+export function standStart(w: World, party: number): void {
+  const G = w.parties[party];
   G.standLeft = G.size;
   for (const p of members(G)) {
     w.setPhase(p, PH.STANDING);

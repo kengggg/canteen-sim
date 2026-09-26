@@ -89,17 +89,18 @@ export function computeRunMetrics(w: World): RunMetrics {
   const sizeF2s: number[][] = [[], [], [], [], [], []];
   const stallServed = new Array(w.st.S).fill(0);
   for (let p = 0; p < P; p++) {
-    const G = w.groupOf(p);
+    const G = w.originOf(p);
+    const n = w.pop.size[G.g];
     const sit = w.sitStartMs[p];
     if (sit >= 0) seated++;
     const outcome = sit >= 0 ? sit : G.walkedAway ? G.walkAwayMs : -1;
     const se = w.st.serviceEndMs[p];
     if (outcome >= 0) {
       e2s.push(outcome - w.entranceMs[p]);
-      sizeE2s[G.size - 1].push(outcome - w.entranceMs[p]);
+      sizeE2s[n - 1].push(outcome - w.entranceMs[p]);
       if (se >= 0 && se <= outcome) {
         f2s.push(outcome - se);
-        sizeF2s[G.size - 1].push(outcome - se);
+        sizeF2s[n - 1].push(outcome - se);
       }
     }
     if (G.walkedAway && se > G.walkAwayMs) servedAfter++;
@@ -126,8 +127,9 @@ export function computeRunMetrics(w: World): RunMetrics {
   const sfG = [0, 0, 0, 0, 0, 0], sfP = [0, 0, 0, 0, 0, 0];
   const sizeGroups = [0, 0, 0, 0, 0, 0], sizePeople = [0, 0, 0, 0, 0, 0], sizeWalk = [0, 0, 0, 0, 0, 0];
   for (const G of w.groups) {
-    sizeGroups[G.size - 1]++;
-    sizePeople[G.size - 1] += G.size;
+    const n = w.pop.size[G.g];
+    sizeGroups[n - 1]++;
+    sizePeople[n - 1] += n;
     if (G.reserver) {
       reserving++;
       if (G.claimEndMs >= 0) claimTimes.push(G.claimEndMs - G.arrivalMs);
@@ -141,12 +143,12 @@ export function computeRunMetrics(w: World): RunMetrics {
     }
     if (G.walkedAway) {
       walkGroups++;
-      sizeWalk[G.size - 1] += G.size;
+      sizeWalk[n - 1] += n;
       if (G.splitFeasible) {
         sfGroups++;
-        sfPeople += G.size;
-        sfG[G.size - 1]++;
-        sfP[G.size - 1] += G.size;
+        sfPeople += n;
+        sfG[n - 1]++;
+        sfP[n - 1] += n;
       }
     }
   }

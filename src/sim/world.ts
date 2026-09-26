@@ -13,7 +13,14 @@ import { Stalls } from './stalls';
 import { EV, EXTRA_MS, GM, K, PH } from './types';
 
 export interface GroupState {
+  /** Original group index (dense). Shared by every party split off the group. */
   g: number;
+  /** Index into World.parties. */
+  party: number;
+  /** The group this party came from (itself for an original group). */
+  origin: GroupState;
+  /** Active members, ascending dense index; `size` always equals people.length. */
+  people: number[];
   first: number;
   size: number;
   arrivalMs: number;
@@ -129,8 +136,10 @@ export class World {
   readonly entranceMs: Float64Array;
   readonly nodeWaitSince: Float64Array;
 
-  // Per group.
+  // Per group (original groups) and per party (original groups first, then parties split off them).
   readonly groups: GroupState[];
+  readonly parties: GroupState[];
+  readonly partyOf: Int32Array;
 
   // Per table and seat.
   readonly occMask: Int32Array;
@@ -239,17 +248,24 @@ export class World {
     const G = this.pop.groupCount;
     this.groups = new Array(G);
     for (let g = 0; g < G; g++) {
-      this.groups[g] = {
-        g, first: this.pop.firstPerson[g], size: this.pop.size[g], arrivalMs: this.pop.arrivalMs[g],
+      const first = this.pop.firstPerson[g], size = this.pop.size[g];
+      const people: number[] = [];
+      for (let m = 0; m < size; m++) people.push(first + m);
+      const gs = (this.groups[g] = {
+        g, party: g, origin: null as unknown as GroupState, people, first, size, arrivalMs: this.pop.arrivalMs[g],
         reserver: this.pop.reserveDraw[g] < this.fraction, mode: GM.FREE, fallback: false, claimed: false,
         claimer: -1, claimTable: -1, claimTargetTable: -1, claimTargetNode: -1, frozen: false, cutoffPassed: false,
         claimEndMs: -1, firstSide: 0, fill: [], fillIdx: 0, history: [], sumCache: null,
         searcher: -1, searchers: [], mem: null, targetOf: new Map(), committedTable: -1, joinedTable: -1, commitMs: -1,
         searcherFoodMs: -1, patienceStamp: 0, walkPending: false, pendingAsks: 0, walkedAway: false, walkAwayMs: -1,
         splitFeasible: false, sitStarted: 0, eatDone: 0, standLeft: 0,
-      };
+      });
+      gs.origin = gs;
       this.q.push(this.pop.arrivalMs[g], K.ARRIVAL, this.pop.personId[this.pop.firstPerson[g]], EV.GROUP_ARRIVE, g, 0);
     }
+
+    this.parties = this.groups.slice();
+    this.partyOf = Int32Array.from(this.pop.group);
 
     const T = this.pc.tableCount;
     this.occMask = new Int32Array(T);
@@ -287,7 +303,13 @@ export class World {
     return this.pop.personId[p];
   }
 
+  /** The party p belongs to now. */
   groupOf(p: number): GroupState {
+    return this.parties[this.partyOf[p]];
+  }
+
+  /** The original group p arrived with. */
+  originOf(p: number): GroupState {
     return this.groups[this.pop.group[p]];
   }
 

@@ -151,8 +151,8 @@ export class Sim implements Engine {
     const isRes = new Uint8Array(P);
     const gs = new Uint8Array(P);
     for (let p = 0; p < P; p++) {
-      const G = w.groupOf(p);
-      gs[p] = G.size;
+      const G = w.originOf(p);
+      gs[p] = w.pop.size[G.g];
       isRes[p] = G.reserver ? 1 : 0;
     }
     this.static = { count: P, personId: w.pop.personId, personGroup: w.pop.group, groupSize: gs, isReserver: isRes, groupId: w.pop.groupId, objectType: w.pop.objectType };
