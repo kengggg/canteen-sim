@@ -83,7 +83,8 @@ test('view() arrays have the documented lengths and consistent segments; live() 
   }
   s.advanceTo(Infinity);
   const l = s.live(), r = s.metrics();
-  expect(l.walkAwayPct).toBeCloseTo(r.walkAwayPct!, 10);
+  expect(l.leftPct).toBeCloseTo(r.leftPct!, 10);
+  expect(l.plateMeanMin).toBeCloseTo(r.plateMeanMin!, 8);
   expect(l.entranceToSeatMeanMin).toBeCloseTo(r.entranceToSeatMeanMin!, 8);
   expect(l.peakThroughputPerHour).toBe(r.peakThroughputPerHour);
   expect(s.progress()).toBe(1);
@@ -100,7 +101,7 @@ test('pairMetrics: shared peak window, P3 in [0, 1], and reserver cohorts', () =
   for (const v of [pm.p3Level, pm.p3Baseline]) expect(v > 0 && v <= 1).toBe(true);
   expect(pm.cohorts.R.level.groups).toBe(A.world.groups.length);
   expect(pm.cohorts.N.level.people).toBe(0);
-  expect(pm.cohorts.N.level.walkAwayPct).toBeNull();
+  expect(pm.cohorts.N.level.leftPct).toBeNull();
   expect(pm.cohorts.Rclaimed.level.groups + pm.cohorts.Rfallback.level.groups).toBe(pm.cohorts.R.level.groups);
   expect(pm.cohorts.Rclaimed.baseline.groups).toBe(pm.cohorts.Rclaimed.level.groups);
   const sum = pm.sharesLevel.reduce((a, b) => a + b, 0);

@@ -14,7 +14,7 @@ export const EV = {
   QUEUE: 9,
   GROUP_ARRIVE: 10,
   ADMIT: 11,
-  PATIENCE: 12,
+  SPLIT: 12,
   CUTOFF: 13,
   RECHOOSE: 14,
   EAT_END: 15,
@@ -54,7 +54,7 @@ export const PU = { NONE: 0, STALL: 1, FULLSTOP: 2, CLAIM: 3, EXPLORE: 4, TABLE:
 export const GM = { FREE: 0, RESERVE: 1, CLAIMED: 2 } as const;
 
 /** Person colour classes (spec §11.6), in precedence order. */
-export const CLS = { CLAIMING: 0, QUEUING: 1, SEARCHING: 2, HOLDING: 3, EATING: 4, WALKED_AWAY: 5, WALKING: 6 } as const;
+export const CLS = { CLAIMING: 0, QUEUING: 1, SEARCHING: 2, HOLDING: 3, EATING: 4, LEFT: 5, WALKING: 6 } as const;
 
 export const SIT_MS = 3000;
 export const STAND_MS = 3000;

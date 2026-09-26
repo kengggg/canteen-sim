@@ -1,5 +1,5 @@
-import { popcount, chooseJoin, chooseUnclaimed, fillOrder, joinAllowed, ownSeat, SEAT } from './seating';
-import { Memory, claimTarget, exploreTarget, freeFlowTarget, observe, type TableTruth } from './search';
+import { popcount, chooseJoin, chooseUnclaimed, fillOrder, joinAllowed, ownSeat } from './seating';
+import { Memory, claimTarget, exploreTarget, freeFlowTarget, observe, splitTarget, type TableTruth } from './search';
 import { ASK_MS, EV, GM, K, PH, PLACE_MS, PU, RECHOOSE_MS, REFUSE_MS, SIT_MS, STAND_MS } from './types';
 import type { GroupState, World } from './world';
 
@@ -24,7 +24,6 @@ export function groupArrive(w: World, g: number): void {
   w.arrived += G.size;
   for (const p of members(G)) {
     w.entranceMs[p] = w.now;
-    w.arrivedEntranceSum += w.now;
     w.mv.placeAt(p, entrance);
   }
   if (!G.reserver) {
@@ -377,27 +376,56 @@ export function serviceEnd(w: World, p: number): void {
   w.st.serviceEnded(p);
   w.setQueuing(p, false);
   w.hasFood[p] = 1;
+  w.servedCount++;
+  w.pendingSeSum += w.now;
   const at = w.st.walkOut(p);
   w.setPhase(p, PH.WALK_OUT);
   w.schedule(at, K.MOVE, w.pidOf(p), EV.WALKOUT_ARRIVE, p);
   const G = w.groupOf(p);
-  if (G.walkedAway) return;
-  if (G.mode === GM.CLAIMED) {
-    assignReserverSeat(w, G, p);
-    return;
+  if (G.mode === GM.CLAIMED) assignReserverSeat(w, G, p);
+  else if (G.mode === GM.FREE && G.committedTable < 0) {
+    if (G.searcher < 0) makeSearcher(w, G, p, w.now);
+    else if (w.parallel) G.searchers.push(p);
   }
-  if (G.mode === GM.RESERVE || G.committedTable >= 0) return;
-  if (G.searcher < 0) makeSearcher(w, G, p, w.now);
-  else if (w.parallel) G.searchers.push(p);
+  if (w.seat[p] < 0) {
+    w.plateNoSeat[p] = 1;
+    w.platesNoSeat++;
+    if (w.platesNoSeat > w.platesNoSeatMax) w.platesNoSeatMax = w.platesNoSeat;
+  }
 }
 
-function makeSearcher(w: World, G: GroupState, p: number, patienceFrom: number): void {
+/** p becomes G's searcher; the split clock starts at `from` (design §2.6). */
+function makeSearcher(w: World, G: GroupState, p: number, from: number): void {
   G.searcher = p;
   G.searchers.push(p);
   G.searcherFoodMs = w.st.serviceEndMs[p];
-  G.patienceStamp++;
-  w.trace?.('searcher', G.g, p, 0);
-  w.schedule(patienceFrom + w.patienceMs, K.TIMER, w.pidOf(G.people[0]), EV.PATIENCE, G.party, G.patienceStamp);
+  if (G.origin.searcherFoodMs < 0) G.origin.searcherFoodMs = G.searcherFoodMs;
+  G.searchStartMs = from;
+  w.trace?.('searcher', G.party, p, 0);
+  if (G.splitMode) return;
+  if (w.splitAfterMs === 0) {
+    enterSplitMode(w, G);
+    return;
+  }
+  G.splitStamp++;
+  w.schedule(from + w.splitAfterMs, K.TIMER, w.pidOf(G.people[0]), EV.SPLIT, G.party, G.splitStamp);
+}
+
+export function onSplitTimer(w: World, party: number, stamp: number): void {
+  const G = w.parties[party];
+  if (stamp !== G.splitStamp || G.splitMode || G.committedTable >= 0 || G.mode !== GM.FREE) return;
+  enterSplitMode(w, G);
+}
+
+/** The party now accepts a table that seats only some of it; searchers standing at a node re-target at once. */
+function enterSplitMode(w: World, G: GroupState): void {
+  G.splitMode = true;
+  w.trace?.('splitmode', G.g, G.party, 0);
+  for (const s of G.searchers.slice()) {
+    if (G.committedTable >= 0) break;
+    if (w.groupOf(s) !== G || !w.searching[s] || w.phase[s] !== PH.SEARCHING || w.mv.edge[s] >= 0 || w.mv.node[s] < 0) continue;
+    searchStep(w, s);
+  }
 }
 
 /** Kind 3: back at the stall walkway stop holding food. */
@@ -405,8 +433,7 @@ export function walkOutArrive(w: World, p: number): void {
   const node = w.pc.G.stallNode[w.st.chosen[p]];
   w.mv.placeAt(p, node);
   const G = w.groupOf(p);
-  if (G.walkedAway) goTray(w, p);
-  else if (w.seat[p] >= 0) goSeat(w, p);
+  if (w.seat[p] >= 0) goSeat(w, p);
   else if (G.mode === GM.FREE && G.searchers.includes(p)) startSearch(w, p);
   else {
     w.setPhase(p, PH.WAIT_FOOD);
@@ -440,15 +467,16 @@ function searchStep(w: World, p: number): void {
   const mem = G.mem!;
   const n = w.mv.node[p];
   const o = { shareMaxParty: w.cfg.reserve.shareMaxParty, shareMinEmpty: w.cfg.reserve.shareMinEmpty, detourMm: w.detourMm };
+  const find = (ex?: (t: number) => boolean) => (G.splitMode ? splitTarget(mem, w.pc, n, G.size, o, w.now, ex) : freeFlowTarget(mem, w.pc, n, G.size, o, w.now, ex));
   let tgt = null;
   if (w.parallel && G.searchers.length > 1) {
     const taken = (t: number) => {
       for (const [q, tt] of G.targetOf) if (q !== p && tt === t) return true;
       return false;
     };
-    tgt = freeFlowTarget(mem, w.pc, n, G.size, o, w.now, taken) ?? freeFlowTarget(mem, w.pc, n, G.size, o, w.now);
+    tgt = find(taken) ?? find();
   } else {
-    tgt = freeFlowTarget(mem, w.pc, n, G.size, o, w.now);
+    tgt = find();
   }
   if (tgt) {
     w.setStuck(p, false);
@@ -469,12 +497,17 @@ function searchStep(w: World, p: number): void {
   else w.onTrip(p);
 }
 
+/** Seats a party needs at one unclaimed table: all of it, or in split mode min(n, 2) (design §2.6). */
+function seatsNeeded(G: GroupState): number {
+  return G.splitMode ? Math.min(G.size, 2) : G.size;
+}
+
 function arrivalCheck(w: World, p: number, t: number): void {
   const G = w.groupOf(p);
   const fc = popcount(w.freeMaskOf(t));
   if (w.claimedBy[t] < 0 && w.occMask[t] === 0) {
-    if (fc >= G.size) {
-      commit(w, G, p, t, false);
+    if (fc >= seatsNeeded(G)) {
+      commit(w, G, p, t, false, Math.min(G.size, fc));
       return;
     }
     G.mem!.learn(t, w.occMask[t], w.heldMask[t], false, w.now);
@@ -489,7 +522,7 @@ function arrivalCheck(w: World, p: number, t: number): void {
   w.mv.stop(p);
   w.actionBusy(n, 1);
   G.pendingAsks++;
-  w.trace?.('ask', G.g, t, 0);
+  w.trace?.('ask', G.party, t, 0);
   w.schedule(w.now + ASK_MS, K.ACTION, w.pidOf(p), EV.ASK_END, p);
 }
 
@@ -505,25 +538,21 @@ export function askEnd(w: World, p: number): void {
   }
   const fc = popcount(w.freeMaskOf(t));
   if (w.claimedBy[t] < 0) {
-    if (fc >= G.size) {
-      commit(w, G, p, t, false);
+    if (fc >= seatsNeeded(G)) {
+      commit(w, G, p, t, false, Math.min(G.size, fc));
       return;
     }
     // Rule 3 → table now unclaimed: rule 1's test without a second ask (no refusal). Rule 2: turned away.
     if (w.askAtClaimed[p]) G.mem!.learn(t, w.occMask[t], w.heldMask[t], false, w.now);
     else refuse(w, G, t, false);
   } else {
-    const allowed = joinAllowed({ complete: w.complete[t] === 1, n: G.size, shareMaxParty: w.cfg.reserve.shareMaxParty, freeCount: fc, shareMinEmpty: w.cfg.reserve.shareMinEmpty });
+    const m = G.splitMode ? Math.min(G.size, w.cfg.reserve.shareMaxParty) : G.size;
+    const allowed = joinAllowed({ complete: w.complete[t] === 1, n: m, shareMaxParty: w.cfg.reserve.shareMaxParty, freeCount: fc, shareMinEmpty: w.cfg.reserve.shareMinEmpty });
     if (allowed) {
-      commit(w, G, p, t, true);
+      commit(w, G, p, t, true, m);
       return;
     }
     refuse(w, G, t, true);
-  }
-  if (G.walkPending) {
-    if (G.pendingAsks === 0) walkAway(w, G);
-    else w.setPhase(p, PH.SEARCHING);
-    return;
   }
   w.setPhase(p, PH.SEARCHING);
   searchStep(w, p);
@@ -534,21 +563,22 @@ function refuse(w: World, G: GroupState, t: number, atClaimed: boolean): void {
   G.mem!.refusedUntil[t] = w.now + REFUSE_MS;
   if (atClaimed) w.turnedAwayClaimed++;
   else w.turnedAwayHeld++;
-  w.trace?.('refuse', G.g, t, atClaimed ? 1 : 0);
+  w.trace?.('refuse', G.party, t, atClaimed ? 1 : 0);
 }
 
-function commit(w: World, G: GroupState, p: number, t: number, join: boolean): void {
+/** Commit m seats at table t for p's party; with m < party size the party splits first (design §2.6). */
+function commit(w: World, G: GroupState, p: number, t: number, join: boolean, m: number): void {
   const n = w.mv.node[p];
   const free = w.freeMaskOf(t);
   let here = 0;
   for (let j = 0; j < w.k2; j++) if (w.pc.G.seatNode[t * w.k2 + j] === n) here |= 1 << j;
-  const set = join ? chooseJoin(w.k, free, w.occMask[t] | w.heldMask[t], G.size, here) : chooseUnclaimed(w.k, free, G.size, here);
+  const rem = m < G.size ? splitOff(w, G, p, m, t) : null;
+  const set = join ? chooseJoin(w.k, free, w.occMask[t] | w.heldMask[t], m, here) : chooseUnclaimed(w.k, free, m, here);
   const own = ownSeat(set, here);
   G.committedTable = t;
   if (join) G.joinedTable = t;
   G.commitMs = w.now;
-  G.walkPending = false;
-  G.patienceStamp++;
+  G.origin.lastCommitMs = w.now;
   const rest = set.filter((j) => j !== own);
   let ri = 0;
   for (const m of members(G)) w.holdSeat(t * w.k2 + (m === p ? own : rest[ri++]), m);
@@ -559,7 +589,7 @@ function commit(w: World, G: GroupState, p: number, t: number, join: boolean): v
   G.searchers = [];
   G.targetOf.clear();
   G.mem = null;
-  w.trace?.('commit', G.g, t, join ? 1 : 0);
+  w.trace?.('commit', G.party, t, join ? 1 : 0);
   for (const m of members(G)) {
     if (m === p) goSeat(w, m);
     else if (w.phase[m] === PH.WAIT_FOOD) {
@@ -567,39 +597,56 @@ function commit(w: World, G: GroupState, p: number, t: number, join: boolean): v
       goSeat(w, m);
     } else if (w.phase[m] === PH.SEARCHING) goSeat(w, m);
   }
+  if (rem) startRemainder(w, G, rem);
 }
 
-// ---------------------------------------------------------------- walk-aways (§5.7)
-
-export function onPatience(w: World, party: number, stamp: number): void {
-  const G = w.parties[party];
-  if (stamp !== G.patienceStamp || G.committedTable >= 0 || G.walkedAway || G.mode !== GM.FREE) return;
-  if (G.pendingAsks > 0) G.walkPending = true;
-  else walkAway(w, G);
+/**
+ * Split p's party at a partial commit of m seats: the searcher, then members holding food (by service end, then
+ * index), then members without food (by index) stay; the others become a new party already in split mode.
+ */
+function splitOff(w: World, G: GroupState, p: number, m: number, t: number): GroupState {
+  const se = w.st.serviceEndMs;
+  const fed = G.people.filter((x) => x !== p && w.hasFood[x]).sort((a, b) => se[a] - se[b] || a - b);
+  const hungry = G.people.filter((x) => x !== p && !w.hasFood[x]);
+  const keep = new Set([p, ...fed, ...hungry].slice(0, m));
+  const rem = G.people.filter((x) => !keep.has(x));
+  G.origin.splits++;
+  w.trace?.('split', G.party, t, m);
+  const R = w.addParty(G, rem);
+  R.splitMode = true;
+  const moving = G.searchers.filter((s) => w.partyOf[s] === R.party);
+  if (moving.length > 0) {
+    G.searchers = G.searchers.filter((s) => w.partyOf[s] === G.party);
+    R.searchers = moving;
+    R.searcher = moving[0];
+    R.mem = G.mem;
+    for (const s of moving) {
+      const tt = G.targetOf.get(s);
+      if (tt !== undefined) {
+        R.targetOf.set(s, tt);
+        G.targetOf.delete(s);
+      }
+    }
+    const asks = moving.filter((s) => w.phase[s] === PH.ASKING).length;
+    R.pendingAsks = asks;
+    G.pendingAsks -= asks;
+    R.searcherFoodMs = se[moving[0]];
+    for (const s of moving) if (se[s] < R.searcherFoodMs) R.searcherFoodMs = se[s];
+    R.searchStartMs = w.now;
+  }
+  return R;
 }
 
-function walkAway(w: World, G: GroupState): void {
-  G.walkedAway = true;
-  G.walkAwayMs = w.now;
-  G.walkPending = false;
-  w.walkAwayPeople += G.size;
-  G.splitFeasible = w.clock.totals[SEAT.FREE] >= G.size;
-  for (const s of G.searchers) {
-    w.setSearching(s, false);
-    w.setStuck(s, false);
-  }
-  G.searchers = [];
-  G.targetOf.clear();
-  G.mem = null;
-  w.trace?.('walkaway', G.g, 0, 0);
-  for (const m of members(G)) {
-    w.outcomeSumMs += w.now - w.entranceMs[m];
-    w.outcomeEntranceSum += w.entranceMs[m];
-    w.outcomeCount++;
-    if (!w.hasFood[m] || w.phase[m] === PH.WALK_OUT) continue;
-    w.setStandingFood(m, false);
-    goTray(w, m);
-  }
+/** After the committing part holds its seats: give the remainder a searcher if one of it already holds food. */
+function startRemainder(w: World, G: GroupState, R: GroupState): void {
+  w.trace?.('remainder', G.party, R.party, R.size);
+  if (R.searchers.length > 0) return;
+  const se = w.st.serviceEndMs;
+  let cand = -1;
+  for (const x of R.people) if (w.hasFood[x] && (cand < 0 || se[x] < se[cand])) cand = x;
+  if (cand < 0) return;
+  makeSearcher(w, R, cand, w.now);
+  if (w.phase[cand] === PH.WAIT_FOOD) startSearch(w, cand);
 }
 
 // ---------------------------------------------------------------- seats, eating, trays, exit
@@ -624,13 +671,13 @@ function sit(w: World, p: number): void {
   w.sitTimes.push(w.now);
   while (w.now - w.sitTimes[w.sitWinLeft] >= 3_600_000) w.sitWinLeft++;
   w.sitWinMax = Math.max(w.sitWinMax, w.sitTimes.length - w.sitWinLeft);
-  w.outcomeSumMs += w.now - w.entranceMs[p];
-  w.outcomeEntranceSum += w.entranceMs[p];
-  w.outcomeCount++;
+  w.seatedE2sSum += w.now - w.entranceMs[p];
+  w.seatedPlateSum += w.now - w.st.serviceEndMs[p];
+  w.pendingSeSum -= w.st.serviceEndMs[p];
   G.sitStarted++;
   if (G.claimed && G.claimTable === t && G.sitStarted === G.size) w.complete[t] = 1;
   w.recomputeTable(t);
-  w.trace?.('sit', G.g, s, 0);
+  w.trace?.('sit', G.party, s, 0);
   w.schedule(w.now + SIT_MS, K.ACTION, w.pidOf(p), EV.SIT_END, p);
 }
 

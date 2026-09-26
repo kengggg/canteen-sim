@@ -156,7 +156,7 @@ export class PeopleLayer {
       const bodyH = sit ? 0.8 : 1.2;
       const base = sit ? 0.35 : 0.1;
       m.makeScale(1, bodyH, 1).setPosition(x, base + bodyH / 2, z);
-      const ghost = v.cls[p] === CLS.WALKED_AWAY;
+      const ghost = v.cls[p] === CLS.LEFT;
       const target = ghost ? this.ghosts : this.bodies;
       const i = ghost ? ng++ : nb++;
       target.setMatrixAt(i, m);

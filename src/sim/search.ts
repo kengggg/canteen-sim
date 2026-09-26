@@ -100,6 +100,17 @@ export function suitable(m: Memory, t: number, n: number, o: TargetOpts, now: nu
   return n <= o.shareMaxParty && m.seated[t] >= 1 && empty >= Math.max(n, o.shareMinEmpty);
 }
 
+/**
+ * Split-mode suitability (design §2.6): an unclaimed table needs min(n, 2) observed-empty seats; a claimed one
+ * takes m = min(n, shareMaxParty) joiners under the sharing rule. Refused tables never qualify.
+ */
+export function splitSuitable(m: Memory, t: number, n: number, o: TargetOpts, now: number): boolean {
+  if (m.refusedUntil[t] > now) return false;
+  const empty = popcount(emptyMask(m, t));
+  if (!m.claimed[t]) return empty >= Math.min(n, 2);
+  return m.seated[t] >= 1 && empty >= Math.max(Math.min(n, o.shareMaxParty), o.shareMinEmpty);
+}
+
 export interface Target { table: number; node: number; dist: number }
 
 /** Distance to a table = min over seats recorded empty of dist(cur, seat node); ties to the lower node id. */
@@ -131,6 +142,23 @@ export function freeFlowTarget(m: Memory, pc: Precomp, cur: number, n: number, o
     }
   }
   if (best && bestEmpty && bestEmpty.dist <= best.dist + o.detourMm) return bestEmpty;
+  return best;
+}
+
+/**
+ * Split-mode target (design §2.6): the most room (seats for up to n members; m for a claimed table), then the lower
+ * distance, then the lower table id, then the lower node id. search.emptyTableDetour does not apply.
+ */
+export function splitTarget(m: Memory, pc: Precomp, cur: number, n: number, o: TargetOpts, now: number, exclude?: (t: number) => boolean): (Target & { room: number }) | null {
+  let best: (Target & { room: number }) | null = null;
+  for (const t of m.list) {
+    if (!splitSuitable(m, t, n, o, now)) continue;
+    if (exclude && exclude(t)) continue;
+    const { node, dist } = tableDist(m, pc, cur, t);
+    if (node < 0) continue;
+    const room = m.claimed[t] ? Math.min(n, o.shareMaxParty) : Math.min(popcount(emptyMask(m, t)), n);
+    if (!best || room > best.room || (room === best.room && (dist < best.dist || (dist === best.dist && t < best.table)))) best = { table: t, node, dist, room };
+  }
   return best;
 }
 

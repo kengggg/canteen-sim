@@ -28,6 +28,7 @@ const A = traced(defaultConfig(), { seed: 1, reserveFraction: 1 }, (s, t) => {
     checks.claimAssign.push((G.fill[0] < w.k) === onNorth);
   }
   if (t.ev === 'commit' && t.c === 1) {
+    const G = w.parties[t.a];
     joins.add(`${t.a}:${t.b}`);
     const free = popcount(w.freeMaskOf(t.b)) + G.size;
     const r = w.cfg.reserve;
@@ -75,10 +76,16 @@ test('joiners obey the sharing rule at every join, and stay when the claiming gr
   expect(checks.unclaim.every(Boolean)).toBe(true);
 });
 
-test('a group that claimed never walks away', () => {
+test('a group that claimed sits at its table: every member either sat there or left without eating', () => {
   const claimed = A.w.groups.filter((G) => G.claimed);
   expect(claimed.length).toBeGreaterThan(0);
-  expect(claimed.every((G) => !G.walkedAway)).toBe(true);
+  for (const G of claimed) {
+    for (let m = A.w.pop.firstPerson[G.g]; m < A.w.pop.firstPerson[G.g] + A.w.pop.size[G.g]; m++) {
+      if (A.w.leftKind[m] !== 0) continue;
+      expect(A.w.sitStartMs[m]).toBeGreaterThanOrEqual(0);
+      expect(A.w.tableOfSeat(A.w.seat[m])).toBe(G.claimTable);
+    }
+  }
 });
 
 test('claim cutoff: a target chosen before the cutoff is still claimed after it', () => {
@@ -101,21 +108,22 @@ test('limit 0: only tables visible from the entrance at entry can be claimed', (
   expect(R.traces.some((t) => t.ev === 'fallback' && t.b === 1 && t.ms === R.w.groups[t.a].arrivalMs)).toBe(true);
 });
 
-test('fallback discards memory and patience counts from the later of food and fallback', () => {
+test('fallback discards memory and the split clock counts from the later of food and fallback', () => {
   const mems: boolean[] = [];
   const R = traced(defaultConfig(), { seed: 4, reserveFraction: 1 }, (s, t) => {
     if (t.ev === 'fallback') mems.push(s.world.groups[t.a].mem === null || s.world.groups[t.a].searchers.length > 0);
   });
   expect(mems.length).toBeGreaterThan(0);
   expect(mems.every(Boolean)).toBe(true);
-  let equal = 0;
+  let early = 0, late = 0;
   for (const G of R.w.groups) {
-    if (!G.fallback || !G.walkedAway) continue;
-    const deadline = Math.max(G.searcherFoodMs, G.claimEndMs) + R.w.patienceMs;
-    expect(G.walkAwayMs).toBeGreaterThanOrEqual(deadline);
-    if (G.walkAwayMs === deadline) equal++;
+    if (!G.fallback || G.searchStartMs < 0) continue;
+    expect(G.searchStartMs).toBe(Math.max(G.searcherFoodMs, G.claimEndMs));
+    if (G.searcherFoodMs < G.claimEndMs) early++;
+    else late++;
   }
-  expect(equal).toBeGreaterThan(0);
+  expect(early).toBeGreaterThan(0);
+  expect(late).toBeGreaterThan(0);
 });
 
 test('together: convoy followers walk exactly the leader node sequence', () => {
@@ -134,5 +142,9 @@ test('together: convoy followers walk exactly the leader node sequence', () => {
     const L = lead.get(R.w.pop.group[p])!;
     expect(seq).toEqual(L.slice(0, seq.length));
   }
-  expect(R.w.groups.filter((G) => G.claimed).every((G) => !G.walkedAway)).toBe(true);
+  for (const G of R.w.groups.filter((x) => x.claimed)) {
+    for (let m = R.w.pop.firstPerson[G.g]; m < R.w.pop.firstPerson[G.g] + R.w.pop.size[G.g]; m++) {
+      if (R.w.leftKind[m] === 0) expect(R.w.tableOfSeat(R.w.seat[m])).toBe(G.claimTable);
+    }
+  }
 });

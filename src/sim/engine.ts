@@ -45,7 +45,8 @@ export interface View {
   active: Uint8Array;
   cls: Uint8Array;
   tray: Uint8Array;
-  walkedAway: Uint8Array;
+  /** 1 while the person has left without eating (on the way out). */
+  left: Uint8Array;
   since: Float64Array;
   x0: Float32Array;
   y0: Float32Array;
@@ -78,13 +79,18 @@ export interface Live {
   searchingWithFood: number;
   claiming: number;
   standingWithFood: number;
-  walkAways: number;
+  /** People holding food with no seat committed or assigned. */
+  platesWithoutSeat: number;
+  /** People who left without eating so far. */
+  left: number;
   arrivals: number;
   exited: number;
   sitStartsLast60: number;
-  /** Provisional P1, P2, P4 (spec §7.6). */
-  walkAwayPct: number | null;
+  /** Mean entrance-to-seat so far, over seated diners. */
   entranceToSeatMeanMin: number | null;
+  /** Provisional P1, P2, P4 (design §4.5). */
+  leftPct: number | null;
+  plateMeanMin: number | null;
   peakThroughputPerHour: number;
 }
 
@@ -189,7 +195,7 @@ export class Sim implements Engine {
       case EV.QUEUE: w.st.now = w.now; w.st.onQueueEvent(q.stamp, p); break;
       case EV.GROUP_ARRIVE: A.groupArrive(w, p); break;
       case EV.ADMIT: w.admitPopped(); w.mv.admitStep(); break;
-      case EV.PATIENCE: A.onPatience(w, p, q.stamp); break;
+      case EV.SPLIT: A.onSplitTimer(w, p, q.stamp); break;
       case EV.CUTOFF: A.onCutoff(w, p); break;
       case EV.RECHOOSE: A.onRechooseTimer(w, p, q.stamp); break;
       case EV.EAT_END: A.eatEnd(w, p); break;
@@ -258,15 +264,14 @@ export class Sim implements Engine {
     const G = w.groups.length;
     const e2s = new Float64Array(P).fill(-1);
     const f2s = new Float64Array(P).fill(-1);
-    const walked = new Uint8Array(P);
+    const left = new Uint8Array(P);
     for (let p = 0; p < P; p++) {
-      const g = w.groupOf(p);
       const sit = w.sitStartMs[p];
-      const outcome = sit >= 0 ? sit : g.walkedAway ? g.walkAwayMs : -1;
-      if (outcome >= 0) e2s[p] = outcome - w.entranceMs[p];
-      const se = w.st.serviceEndMs[p];
-      if (outcome >= 0 && se >= 0 && se <= outcome) f2s[p] = outcome - se;
-      walked[p] = g.walkedAway ? 1 : 0;
+      if (sit >= 0) {
+        e2s[p] = sit - w.entranceMs[p];
+        f2s[p] = sit - w.st.serviceEndMs[p];
+      }
+      left[p] = w.leftKind[p] !== 0 ? 1 : 0;
     }
     const claimed = new Uint8Array(G), fb = new Uint8Array(G);
     for (let g = 0; g < G; g++) {
@@ -276,7 +281,7 @@ export class Sim implements Engine {
     return {
       seats: w.pc.L.seats.length, endMs: w.now, bins: w.clock.bins.slice(),
       groupReserveDraw: w.pop.reserveDraw, groupClaimed: claimed, groupFallback: fb, groupSize: w.pop.size,
-      personGroup: w.pop.group, e2sMs: e2s, f2sMs: f2s, walkedAway: walked,
+      personGroup: w.pop.group, e2sMs: e2s, f2sMs: f2s, left,
     };
   }
 
@@ -299,8 +304,8 @@ export class Sim implements Engine {
     const cur = Math.floor(w.now / MINUTE_MS);
     let last60 = 0;
     for (let mm = Math.max(0, cur - 59); mm <= cur && mm < c.minutes; mm++) last60 += c.sitBins[mm];
-    const noOutcome = w.arrived - w.outcomeCount;
-    const p2 = w.arrived > 0 ? (w.outcomeSumMs + w.now * noOutcome - (w.arrivedEntranceSum - w.outcomeEntranceSum)) / w.arrived / MINUTE_MS : null;
+    const seated = w.sitTimes.length;
+    const pending = w.servedCount - seated;
     return {
       nowMs: w.now,
       seatsByState: Array.from(c.totals),
@@ -308,12 +313,14 @@ export class Sim implements Engine {
       searchingWithFood: w.searchingNow,
       claiming: w.claimingNow,
       standingWithFood: c.standing,
-      walkAways: w.walkAwayPeople,
+      platesWithoutSeat: w.platesNoSeat,
+      left: w.leftPeople,
       arrivals: w.arrived,
       exited: w.exited,
       sitStartsLast60: last60,
-      walkAwayPct: w.arrived > 0 ? (100 * w.walkAwayPeople) / w.arrived : null,
-      entranceToSeatMeanMin: p2,
+      entranceToSeatMeanMin: seated > 0 ? w.seatedE2sSum / seated / MINUTE_MS : null,
+      leftPct: w.arrived > 0 ? (100 * w.leftPeople) / w.arrived : null,
+      plateMeanMin: w.servedCount > 0 ? (w.seatedPlateSum + w.now * pending - w.pendingSeSum) / w.servedCount / MINUTE_MS : null,
       peakThroughputPerHour: w.sitWinMax,
     };
   }
@@ -337,7 +344,7 @@ export class Sim implements Engine {
     const S = w.pc.L.seats.length;
     const v = (this.viewBuf ??= {
       version: 0, nowMs: 0,
-      active: new Uint8Array(P), cls: new Uint8Array(P), tray: new Uint8Array(P), walkedAway: new Uint8Array(P), since: new Float64Array(P),
+      active: new Uint8Array(P), cls: new Uint8Array(P), tray: new Uint8Array(P), left: new Uint8Array(P), since: new Float64Array(P),
       x0: new Float32Array(P), y0: new Float32Array(P), x1: new Float32Array(P), y1: new Float32Array(P),
       t0: new Float64Array(P), t1: new Float64Array(P), laneOffset: new Float32Array(P), leader: new Int32Array(P),
       waitKind: new Uint8Array(P), waitRank: new Int32Array(P), waitNode: new Int32Array(P), waitToward: new Int32Array(P), seat: new Int32Array(P), isClaimer: new Uint8Array(P),
@@ -363,7 +370,7 @@ export class Sim implements Engine {
       const grp = w.groupOf(p);
       v.cls[p] = classOf(w, p);
       v.tray[p] = w.hasFood[p] || w.usedTray[p] ? 1 : 0;
-      v.walkedAway[p] = grp.walkedAway && (w.hasFood[p] || w.st.serviceEndMs[p] >= 0) ? 1 : 0;
+      v.left[p] = w.leftKind[p] !== 0 ? 1 : 0;
       v.since[p] = w.phaseSince[p];
       v.isClaimer[p] = grp.claimer === p ? 1 : 0;
       if (ph === PH.SITTING || ph === PH.EATING || ph === PH.STANDING) v.seat[p] = w.seat[p];
@@ -438,7 +445,7 @@ function classOf(w: World, p: number): number {
   if (ph === PH.SITTING || ph === PH.EATING || ph === PH.STANDING) {
     return G.sitStarted < G.size ? CLS.HOLDING : CLS.EATING;
   }
-  if (G.walkedAway && (w.hasFood[p] || w.st.serviceEndMs[p] >= 0)) return CLS.WALKED_AWAY;
+  if (w.leftKind[p] !== 0) return CLS.LEFT;
   return CLS.WALKING;
 }
 

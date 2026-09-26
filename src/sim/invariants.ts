@@ -68,9 +68,15 @@ export function checkInvariants(w: World): void {
   // Liveness (§4.2 rule 1): outside a pending kind-6 step, no FIFO head could enter now.
   if (!w.admitIsPending() && mv.admissibleHeads() > 0) fail('a FIFO head could enter but was not admitted');
 
+  // Plates stay (design §2.5): nobody exits holding food.
+  for (let p = 0; p < P; p++) if (w.phase[p] === PH.EXITED && w.hasFood[p]) fail(`person ${p} exited holding food`);
+
   if (w.done && !w.truncated) {
     let seated = 0;
-    for (let p = 0; p < P; p++) if (w.sitStartMs[p] >= 0) seated++;
-    if (w.arrived !== seated + w.walkAwayPeople) fail(`arrivals ${w.arrived} ≠ seated ${seated} + walk-aways ${w.walkAwayPeople}`);
+    for (let p = 0; p < P; p++) {
+      if (w.sitStartMs[p] >= 0) seated++;
+      else if (w.st.serviceEndMs[p] >= 0) fail(`person ${p} was served but never sat`);
+    }
+    if (w.arrived !== seated + w.leftPeople) fail(`arrivals ${w.arrived} ≠ seated ${seated} + left ${w.leftPeople}`);
   }
 }

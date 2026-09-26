@@ -50,12 +50,14 @@ export interface GroupState {
   joinedTable: number;
   commitMs: number;
   searcherFoodMs: number;
-  patienceStamp: number;
-  walkPending: boolean;
+  /** Search start (the old patience start): split clock origin, design §2.6. */
+  searchStartMs: number;
+  splitMode: boolean;
+  splitStamp: number;
   pendingAsks: number;
-  walkedAway: boolean;
-  walkAwayMs: number;
-  splitFeasible: boolean;
+  // Per original group (kept on the origin): split commits and the latest commit ms.
+  splits: number;
+  lastCommitMs: number;
   // Eating and leaving.
   sitStarted: number;
   eatDone: number;
@@ -68,6 +70,21 @@ export interface EngineOpts {
   trace?: (event: string, a: number, b: number, c: number) => void;
   /** With __SIM_INVARIANTS__, check invariants after every n-th event (default 1000) and at the end. */
   invariantEvery?: number;
+}
+
+/** A party record with every field at its initial value. */
+function blankParty(g: number, party: number, origin: GroupState | null, people: number[], arrivalMs: number, reserver: boolean): GroupState {
+  const G: GroupState = {
+    g, party, origin: origin as GroupState, people, first: people[0], size: people.length, arrivalMs,
+    reserver, mode: GM.FREE, fallback: false, claimed: false,
+    claimer: -1, claimTable: -1, claimTargetTable: -1, claimTargetNode: -1, frozen: false, cutoffPassed: false,
+    claimEndMs: -1, firstSide: 0, fill: [], fillIdx: 0, history: [], sumCache: null,
+    searcher: -1, searchers: [], mem: null, targetOf: new Map(), committedTable: -1, joinedTable: -1, commitMs: -1,
+    searcherFoodMs: -1, searchStartMs: -1, splitMode: false, splitStamp: 0, pendingAsks: 0, splits: 0, lastCommitMs: -1,
+    sitStarted: 0, eatDone: 0, standLeft: 0,
+  };
+  if (!origin) G.origin = G;
+  return G;
 }
 
 /** All mutable state of one run, plus low-level helpers shared by the behaviour code. */
@@ -89,7 +106,7 @@ export class World {
   readonly simEnd: number;
   readonly walk: number;
   readonly tray: number;
-  readonly patienceMs: number;
+  readonly splitAfterMs: number;
   readonly claimLimitMs: number;
   readonly lingerMs: number;
   readonly dropMs: number;
@@ -135,6 +152,10 @@ export class World {
   readonly exitMs: Float64Array;
   readonly entranceMs: Float64Array;
   readonly nodeWaitSince: Float64Array;
+  /** Holding food with no seat committed or assigned (design §4.2 plates-without-seat count). */
+  readonly plateNoSeat: Uint8Array;
+  /** How the person left without eating (types LEFT); 0 while they have not. */
+  readonly leftKind: Uint8Array;
 
   // Per group (original groups) and per party (original groups first, then parties split off them).
   readonly groups: GroupState[];
@@ -160,7 +181,8 @@ export class World {
   // Counters.
   arrived = 0;
   exited = 0;
-  walkAwayPeople = 0;
+  /** People who left without eating (design §4.1 P1 numerator). */
+  leftPeople = 0;
   turnedAwayClaimed = 0;
   turnedAwayHeld = 0;
   fallbackGroups = 0;
@@ -169,12 +191,17 @@ export class World {
   queuingNow = 0;
   readonly eventsPerKind = new Float64Array(8);
   readonly sitTimes: number[] = [];
-  outcomeSumMs = 0;
-  outcomeCount = 0;
-  outcomeEntranceSum = 0;
+  /** Σ (sit start − entrance) over seated diners. */
+  seatedE2sSum = 0;
+  /** Served people and Σ (sit start − service end) over seated diners (live P2). */
+  servedCount = 0;
+  /** Σ service-end ms over people served but not yet seated. */
+  pendingSeSum = 0;
+  seatedPlateSum = 0;
+  platesNoSeat = 0;
+  platesNoSeatMax = 0;
   sitWinLeft = 0;
   sitWinMax = 0;
-  arrivedEntranceSum = 0;
   lastEventMs = 0;
   version = 0;
 
@@ -190,7 +217,7 @@ export class World {
     this.simEnd = this.T + EXTRA_MS;
     this.walk = Math.round(cfg.move.walkSpeed * 1000);
     this.tray = Math.round(cfg.move.traySpeed * 1000);
-    this.patienceMs = Math.round(cfg.search.patience * 1000);
+    this.splitAfterMs = Math.round(cfg.search.splitAfter * 1000);
     this.claimLimitMs = Math.round(cfg.reserve.claimSearchLimit * 1000);
     this.lingerMs = Math.round(cfg.eat.linger * 1000);
     this.dropMs = Math.round(cfg.tray.dropTime * 1000);
@@ -244,6 +271,8 @@ export class World {
     this.exitMs = new Float64Array(P).fill(-1);
     this.entranceMs = new Float64Array(P).fill(-1);
     this.nodeWaitSince = new Float64Array(P).fill(-1);
+    this.plateNoSeat = new Uint8Array(P);
+    this.leftKind = new Uint8Array(P);
 
     const G = this.pop.groupCount;
     this.groups = new Array(G);
@@ -251,15 +280,7 @@ export class World {
       const first = this.pop.firstPerson[g], size = this.pop.size[g];
       const people: number[] = [];
       for (let m = 0; m < size; m++) people.push(first + m);
-      const gs = (this.groups[g] = {
-        g, party: g, origin: null as unknown as GroupState, people, first, size, arrivalMs: this.pop.arrivalMs[g],
-        reserver: this.pop.reserveDraw[g] < this.fraction, mode: GM.FREE, fallback: false, claimed: false,
-        claimer: -1, claimTable: -1, claimTargetTable: -1, claimTargetNode: -1, frozen: false, cutoffPassed: false,
-        claimEndMs: -1, firstSide: 0, fill: [], fillIdx: 0, history: [], sumCache: null,
-        searcher: -1, searchers: [], mem: null, targetOf: new Map(), committedTable: -1, joinedTable: -1, commitMs: -1,
-        searcherFoodMs: -1, patienceStamp: 0, walkPending: false, pendingAsks: 0, walkedAway: false, walkAwayMs: -1,
-        splitFeasible: false, sitStarted: 0, eatDone: 0, standLeft: 0,
-      });
+      const gs = (this.groups[g] = blankParty(g, g, null, people, this.pop.arrivalMs[g], this.pop.reserveDraw[g] < this.fraction));
       gs.origin = gs;
       this.q.push(this.pop.arrivalMs[g], K.ARRIVAL, this.pop.personId[this.pop.firstPerson[g]], EV.GROUP_ARRIVE, g, 0);
     }
@@ -378,7 +399,24 @@ export class World {
     this.version++;
   }
 
+  /** Split `people` off party G into a new free-flow party (design §2.6); returns it. Seat and search state is the caller's. */
+  addParty(G: GroupState, people: number[]): GroupState {
+    const R = blankParty(G.g, this.parties.length, G.origin, people, G.arrivalMs, G.reserver);
+    R.fallback = G.fallback;
+    this.parties.push(R);
+    for (const p of people) this.partyOf[p] = R.party;
+    const rest = G.people.filter((p) => this.partyOf[p] === G.party);
+    G.people = rest;
+    G.size = rest.length;
+    G.first = rest[0];
+    return R;
+  }
+
   holdSeat(s: number, p: number): void {
+    if (this.plateNoSeat[p]) {
+      this.plateNoSeat[p] = 0;
+      this.platesNoSeat--;
+    }
     const t = this.tableOfSeat(s);
     this.heldMask[t] |= 1 << (s - t * this.k2);
     this.seatGroup[s] = this.pop.group[p];

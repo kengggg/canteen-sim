@@ -12,8 +12,8 @@ const B = runB(1, (s, t: Tr) => {
   if (t.ev !== 'commit') return;
   // At commit, every member's seat is held on that table.
   const w = s.world;
-  const G = w.groups[t.a];
-  for (let m = G.first; m < G.first + G.size; m++) {
+  const G = w.parties[t.a];
+  for (const m of G.people) {
     const seat = w.seat[m];
     const tb = w.tableOfSeat(seat);
     t.snap = t.snap ?? [];
@@ -26,7 +26,7 @@ test('B at defaults runs to done: not truncated, everyone out', () => {
   expect(B.sim.truncated).toBe(false);
   expect(B.w.exited).toBe(B.w.pop.personCount);
   const r = B.sim.metrics();
-  expect(r.arrivals).toBe(r.seated + r.walkAways);
+  expect(r.arrivals).toBe(r.seated + r.leftPeople);
 });
 
 test('everybody passes the tray return before exiting', () => {
@@ -37,13 +37,13 @@ test('everybody passes the tray return before exiting', () => {
   }
 });
 
-test('a party of n sits at one table, and groups stand up together', () => {
+test('a party sits at one table and stands up together (split-off parties are parties of their own)', () => {
   const w = B.w;
-  for (const G of w.groups) {
-    if (G.walkedAway) continue;
+  for (const G of w.parties) {
+    if (G.size === 0) continue;
     const tables = new Set<number>();
     const stands = new Set<number>();
-    for (let m = G.first; m < G.first + G.size; m++) {
+    for (const m of G.people) {
       expect(w.sitStartMs[m]).toBeGreaterThanOrEqual(0);
       tables.add(w.tableOfSeat(w.seat[m]));
       stands.add(w.standMs[m]);
@@ -58,9 +58,9 @@ test('the first member with food becomes the searcher (ties to the lowest id)', 
   const searchers = B.traces.filter((t) => t.ev === 'searcher');
   expect(searchers.length).toBeGreaterThan(0);
   for (const t of searchers) {
-    const G = w.groups[t.a];
+    const G = w.parties[t.a];
     let first = -1;
-    for (let m = G.first; m < G.first + G.size; m++) {
+    for (const m of G.people) {
       const se = w.st.serviceEndMs[m];
       if (first < 0 || se < w.st.serviceEndMs[first]) first = m;
     }

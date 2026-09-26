@@ -105,3 +105,62 @@ test('ruling 4: learned held seats stay taken until seen occupied', () => {
   observe(m, P, node, 20, w);
   expect(m.heldMask[t]).toBe(0b001100);
 });
+
+describe('split mode (design §2.6)', () => {
+  test('suitability: unclaimed needs min(n, 2) empty seats; claimed tables take up to shareMaxParty', async () => {
+    const { splitSuitable } = await import('../../src/sim/search');
+    const m = new Memory(P);
+    m.record(0, 0b111110, false, 0); // 1 empty
+    expect(splitSuitable(m, 0, 1, opts, 0)).toBe(true);
+    expect(splitSuitable(m, 0, 3, opts, 0)).toBe(false);
+    m.record(1, 0b111100, false, 0); // 2 empty
+    expect(splitSuitable(m, 1, 2, opts, 0)).toBe(true);
+    expect(splitSuitable(m, 1, 3, opts, 0)).toBe(true);
+    expect(splitSuitable(m, 1, 6, opts, 0)).toBe(true);
+    m.record(2, 0b000011, true, 0); // claimed, 2 seated, 4 empty
+    expect(splitSuitable(m, 2, 5, opts, 0)).toBe(true); // 2 of the 5 may join
+    expect(splitSuitable(m, 2, 5, { ...opts, shareMinEmpty: 6 }, 0)).toBe(false); // sharing off
+    m.record(3, 0b000111, true, 0); // claimed, 3 empty < shareMinEmpty
+    expect(splitSuitable(m, 3, 5, opts, 0)).toBe(false);
+    m.record(4, 0, true, 0); // claimed, nobody seated
+    expect(splitSuitable(m, 4, 1, opts, 0)).toBe(false);
+    m.refusedUntil[1] = 10;
+    expect(splitSuitable(m, 1, 3, opts, 5)).toBe(false);
+  });
+
+  test('target: most room (seats up to n), then distance, then table id, then node id; the detour setting is ignored', async () => {
+    const { splitSuitable, splitTarget } = await import('../../src/sim/search');
+    const k2 = 6;
+    let rng = 12345;
+    const rand = (n: number) => { rng = (Math.imul(rng, 1103515245) + 12345) >>> 0; return rng % n; };
+    for (let trial = 0; trial < 300; trial++) {
+      const m = new Memory(P);
+      const n = 1 + rand(6);
+      for (let i = 0; i < 12; i++) m.record(rand(T), rand(64), rand(4) === 0, 0);
+      const cur = P.G.seatNode[rand(T * k2)];
+      let want: { table: number; node: number; room: number; dist: number } | null = null;
+      for (const t of m.list) {
+        if (!splitSuitable(m, t, n, opts, 0)) continue;
+        const empty = ~(m.occMask[t] | m.heldMask[t]) & 63;
+        let best = 0x7fffffff, node = -1;
+        for (let j = 0; j < k2; j++) {
+          if (!((empty >>> j) & 1)) continue;
+          const a = P.G.seatNode[t * k2 + j], d = P.R.dist(cur, a);
+          if (d < best || (d === best && a < node)) { best = d; node = a; }
+        }
+        let c = 0;
+        for (let j = 0; j < k2; j++) c += (empty >>> j) & 1;
+        const room = m.claimed[t] ? Math.min(n, opts.shareMaxParty) : Math.min(c, n);
+        if (!want || room > want.room || (room === want.room && (best < want.dist || (best === want.dist && t < want.table)))) want = { table: t, node, room, dist: best };
+      }
+      const got = splitTarget(m, P, cur, n, opts, 0);
+      const gotDetour = splitTarget(m, P, cur, n, { ...opts, detourMm: 20_000 }, 0);
+      if (!want) {
+        expect(got).toBeNull();
+        continue;
+      }
+      expect(got).toMatchObject(want);
+      expect(gotDetour).toEqual(got);
+    }
+  });
+});
