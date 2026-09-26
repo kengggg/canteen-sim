@@ -94,3 +94,23 @@ Decisions the implementer made where the spec was silent, ambiguous or contradic
 - Task 8: Ruling: rendered-text check done with Playwright on the installed Chrome (channel 'chrome'); Playwright's own browsers are not installed for this Playwright version — cost if wrong: none
 - Task 7: GATE: B-only check PASS — B mean left without eating 16.22% (≤ 20%), mean plate 0.50 min (≤ 10), 0 truncated. A-vs-B outcomes may now be computed (design §5.5).
 - Task 8: RESULT for owner: mechanism test (Reservation-friendly) median A−B +6.3 s [5.7, 6.9] (expected failure kept), mean −8.9 s [−12.1, −5.7] (passes) — same pattern as model 1; the median-vs-mean decision is still the owner's.
+- Final: Ruling: re-graded Minor 1 (seat-search time pushes 0 for claimed groups never served) to Important — it deviates from the §7.3 definition ("0 for groups that sat at their claimed table") and biases a published measure toward reservation — cost if wrong: one extra regeneration
+- Final: Ruling: re-graded Minor 3 (Findings "needs a table that looks completely free", false for groups of 5) to Important — design §6.3 requires every Findings sentence to be true — cost if wrong: none
+- Final: Ruling: Important 4 (freeze approval not on record) is the owner's to settle — the harness refused to record an approval the owner never stated; the design commit f46399e precedes every A-vs-B run (verified by the reviewer), so the panel's "fixed before any results were seen" is true of the record; surfaced to the owner — cost if wrong: the panel sentence needs softening if the owner does not confirm
+- Final: Ruling: declined-to-judge "FIFO waiters lose their place on a re-plan at a node" stands — pre-existing pattern (fallback), main spec §4.2 rule 8 makes a re-plan at a node take effect at once — cost if wrong: a few seconds' queue position for a re-targeting searcher
+- Final: Ruling: declined-to-judge "walk-in and move-up can briefly share a physical slot" stands — pre-existing since model 1, visual only; the invariant covers idle people as planned — cost if wrong: a momentary overlap in the 3D view
+- Final: Ruling: declined-to-judge "queue wait excludes queue leavers" stands — design §4.2 keeps queue wait unchanged; leavers are counted by P1 — cost if wrong: queue wait slightly understates what leavers endured
+- Final: Ruling: declined-to-judge "seated-diners count not shown beside P1 in the UI" stands — pre-existing gap at the base commit, not introduced here; the count is in the CSV — cost if wrong: one missing figure on screen
+- Final: Ruling: declined-to-judge "main spec v4 not audited line by line" — accepted; the fold-in was grep-checked for stale walk-away/patience wording and the ledger test passes — cost if wrong: a stale sentence in the main spec
+- Final: Ruling: declined-to-judge "e2e/build not re-run by the reviewer" — the executor re-runs build:pages and the full Playwright suite after the fix pass — cost if wrong: none
+- Final: Ruling: declined-to-judge "hover-card states and fade not checked on screen" stands — code paths reviewed; visual polish belongs to sub-project (a) — cost if wrong: a label may read awkwardly
+- Final: Ruling: declined-to-judge "seat search counts from a fallback group's first food" stands — the literal §7.3 definition — cost if wrong: fallback groups' seat search includes pre-fallback time
+- Final: minor (deferred): src/ui/labels.ts class help for "Searching with food" still says "a table where the whole group fits" (false in split mode)
+- Final: minor (deferred): tests/sim/engine.determinism.test.ts identical-inputs check does not compare pop.leavePct/waitLimitMs/roomNeeded (design §7.3); the population test covers the draws indirectly
+- Final: minor (deferred): the 'qleave' trace carries the party index (plan said (g, p, 0)); tests read it as a party — note for trace consumers
+- Final: fixed seat-search time counting 0 for claimed groups never served — 'seat search time: a claimed group counts as 0 only if a member was served…' RED→GREEN (first draft was vacuous at 100%, rerun at 50%), unit 244/244, sanity 179/179
+- Final: fixed Findings door share worded per group (it is per person) — e2e 'the rendered prose…' RED→GREEN, e2e 37/37
+- Final: fixed ungated "only add groups that find no table" (rush claims rise 54→77) — same e2e test RED→GREEN
+- Final: fixed causal "A table helps its group" and the In-short Who-pays cause — same e2e test RED→GREEN
+- Final: fixed "needs a table that looks completely free" (false for 5) — same e2e test RED→GREEN
+- Final: note: the seat-search fix changed RunMetrics, so evidence, golden hashes and findings.json were regenerated; headline P1–P4 unchanged (behaviour unchanged).

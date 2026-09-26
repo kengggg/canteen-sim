@@ -163,3 +163,21 @@ test('with a 60-minute wait limit, no spread and no seating check, nobody leaves
   });
   for (const f of [1, 0]) expect(traced(c, { seed: 1, reserveFraction: f }).sim.metrics().leftPeople).toBe(0);
 });
+
+test('seat search time: a claimed group counts as 0 only if a member was served; groups that never had food are left out', () => {
+  const R = traced(tight, { seed: 1, reserveFraction: 0.5 }); // 50%: free-flow searches too, so the zeros matter
+  const w = R.w;
+  const xs: number[] = [];
+  let unfedClaimed = 0;
+  for (const G of w.groups) {
+    let fed = false;
+    for (let p = w.pop.firstPerson[G.g]; p < w.pop.firstPerson[G.g] + w.pop.size[G.g]; p++) if (w.st.serviceEndMs[p] >= 0) fed = true;
+    if (G.claimed) {
+      if (fed) xs.push(0);
+      else unfedClaimed++;
+    } else if (G.searcherFoodMs >= 0 && G.lastCommitMs >= 0) xs.push(G.lastCommitMs - G.searcherFoodMs);
+  }
+  expect(unfedClaimed).toBeGreaterThan(0);
+  expect(xs.some((x) => x > 0)).toBe(true);
+  expect(R.sim.metrics().seatSearchMeanMin).toBeCloseTo(xs.reduce((a, b) => a + b, 0) / xs.length / 60_000, 12);
+});

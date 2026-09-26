@@ -143,7 +143,8 @@ export function computeRunMetrics(w: World): RunMetrics {
     }
     if (G.claimed) {
       claimedGroups++;
-      search.push(0);
+      // 0 for a group that sat at its claimed table; a claimed group whose members all left before food has no search.
+      if (fed[G.g]) search.push(0);
     } else if (G.searcherFoodMs >= 0 && G.lastCommitMs >= 0) {
       search.push(G.lastCommitMs - G.searcherFoodMs);
     }

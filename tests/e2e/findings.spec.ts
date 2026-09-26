@@ -85,6 +85,14 @@ test('the rendered prose and tables carry the evidence and findings figures', as
     'The lunch the app plays on screen has free-flow leaving of 18.2%',
   ]) expect(text, s).toContain(s);
   for (const old of ['walk away', 'walk-away', 'takeaway']) expect(text.toLowerCase(), old).not.toContain(old);
+  // Final review: per-person shares worded per person, no ungated "only", no causal claim the model cannot make.
+  for (const s2 of [
+    '12.9% of the people arriving at a canteen where every group reserves turn round at once, against 1.6% under free flow; for nearly all of them the reason includes the seating',
+    'mostly add groups that find no table (+23 claims per lunch against +284 groups with no table, from 25% to 100%)',
+    'They all got past the door and then met shorter queues; the table itself keeps no one in a queue.',
+    'A group that size needs a table with at least that many seats nobody sits on',
+  ]) expect(text, s2).toContain(s2);
+  for (const bad of ['A table helps its group', 'only add groups that find no table', 'A group arriving at a canteen', 'needs a table that looks completely free']) expect(text, bad).not.toContain(bad);
   const row100 = panel.locator('table.fhead tbody tr').nth(4);
   await expect(row100.locator('td').nth(0)).toHaveText('21.4%: +4.8 pp [4.4, 5.1]');
   await expect(row100.locator('td').nth(2)).toHaveText('55.8%: −4.7 pp [−5.1, −4.3]');
