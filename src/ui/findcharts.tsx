@@ -93,15 +93,20 @@ export function StackedBars({ categories, axisLabels = categories, series, yMax 
   const [id] = useState(() => `fc${++uid}`);
   const [labelMetrics, setLabelMetrics] = useState({ above: 10, below: 4 });
   const direct = labelLast && w >= 520;
-  // SVG font bounds differ across engines, especially for Thai tone marks and mixed-script labels.
-  // Measure the actual face instead of relying on a fixed line gap.
+  // Text screen bounds can extend beyond getBBox(), notably in Firefox with Thai marks.
+  // Measure screen bounds and convert back to SVG units instead of relying on a fixed line gap.
   useLayoutEffect(() => {
     if (!direct || !ref.current) return;
+    const svg = ref.current.querySelector('svg')!;
+    const bounds = svg.getBoundingClientRect();
+    const scale = bounds.height / Number(svg.getAttribute('height'));
+    if (scale <= 0) return;
     let above = 0, below = 0;
     for (const text of ref.current.querySelectorAll<SVGTextElement>('.fdirect text')) {
-      const box = text.getBBox(), baseline = Number(text.getAttribute('y'));
-      above = Math.max(above, baseline - box.y);
-      below = Math.max(below, box.y + box.height - baseline);
+      const box = text.getBoundingClientRect();
+      const baseline = bounds.top + Number(text.getAttribute('y')) * scale;
+      above = Math.max(above, (baseline - box.top) / scale);
+      below = Math.max(below, (box.bottom - baseline) / scale);
     }
     const next = { above: Math.ceil(above * 10) / 10, below: Math.ceil(below * 10) / 10 };
     if (next.above !== labelMetrics.above || next.below !== labelMetrics.below) setLabelMetrics(next);

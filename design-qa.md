@@ -1,6 +1,22 @@
 # Canteen Sim implementation review — 2026-10-05
 
-## Deployment follow-up: browser portability
+## Latest release check: Linux Firefox label bounds
+
+The [second Linux release run](https://github.com/kengggg/canteen-sim/actions/runs/37303532487) passed
+103 of 104 browser cases. Both Chromium startup checks and Firefox language-state preservation passed;
+only Firefox's Thai direct-label spacing still blocked publishing.
+
+The failure was reproduced locally in `mcr.microsoft.com/playwright:v1.63.0-noble`. Firefox reported
+19 px SVG font bounds but approximately 21 px screen bounds for the same text. Label spacing now uses
+the screen bounds, converted to SVG coordinates, including enough vertical room for the complete labels.
+
+Validation: all **23 Linux Firefox cases passed**. The chart regression also passes in Linux Chromium
+and WebKit, and in macOS Chromium and WebKit, at 320, 390 and 1280 px. Lint, typechecking and the hosting
+build pass; the single HTML is **1,566,210 bytes**, below 1.5 MiB. Native macOS Firefox still cannot launch,
+but Linux container coverage provides a local reproduction and verification path. The complete release
+pipeline remains required before publication.
+
+## Earlier deployment check: browser portability
 
 The [first Linux release run](https://github.com/kengggg/canteen-sim/actions/runs/37299840881) passed
 lint, typechecking, all 276 unit tests and all 181 model-sanity checks, then passed 97 of 101 browser cases.
