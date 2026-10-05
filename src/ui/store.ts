@@ -1,3 +1,5 @@
+import { msg } from '../i18n';
+import { noticeText } from './notice-text';
 import { computed, signal } from '@preact/signals';
 import { applyValues } from '../config/load';
 import { cloneConfig } from '../config/meta';
@@ -68,7 +70,8 @@ export const colorByGroup = signal(false);
 export const seatTints = signal(false);
 export const hover = signal<(Pick & { x: number; y: number }) | null>(null);
 export const webgl = signal<'ok' | 'none' | 'lost'>('ok');
-export const notices = signal<string[]>(initial.notices);
+export type Notice = string | (() => string);
+export const notices = signal<Notice[]>(initial.notices);
 export const skipProgress = signal<number | null>(null);
 export const endCardOpen = signal(false);
 export const evidenceOpen = signal(false);
@@ -89,7 +92,8 @@ export function editPending(fn: (c: Config) => void): void {
 /** Restart with the pending settings (spec §9.4 "Apply on Restart"). */
 export function restart(): void {
   if (validation.value.blocking.length > 0) {
-    note(`These settings cannot run: ${validation.value.blocking.map((b) => b.message).join(' ')}`);
+    const issues = validation.value.blocking;
+    note(() => msg('These settings cannot run: {issues}', { issues: issues.map((b) => noticeText(b.message)).join(' ') }));
     return;
   }
   controller.rebuild(pending.value);
@@ -115,7 +119,7 @@ export function releaseSlider(percent: number): void {
   tick.value++;
 }
 
-export function note(msg: string): void {
+export function note(msg: Notice): void {
   notices.value = [...notices.value, msg];
 }
 

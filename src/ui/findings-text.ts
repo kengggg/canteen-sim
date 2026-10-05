@@ -1,3 +1,4 @@
+import { msg as trText } from '../i18n';
 import { num } from './format';
 
 /** Text helpers for the Findings panel (spec §11.13): formatting and the few judgement words, each backed by a check. */
@@ -24,7 +25,7 @@ export function range(lo: number, hi: number, d = 0, k = 1, unit = ''): string {
 }
 
 /** "a, b and c". */
-export const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+export const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : trText("{v0} and {v1}", { v0: (xs.slice(0, -1).join(', ')), v1: (xs[xs.length - 1]) }));
 
 /** A 95% range in brackets with signs on both ends: " [−0.4, +0.6]"; empty when there is no interval. */
 export function bracket(lo: number | null, hi: number | null, d: number, signed = false): string {
@@ -43,7 +44,7 @@ export function aboutTwoThirds(shares: number[]): boolean {
 
 /** "more than tenfold" for ratios of 10 or more, else "about N-fold" (N whole). */
 export function fold(ratio: number): string {
-  return ratio >= 10 ? 'more than tenfold' : `about ${Math.round(ratio)}-fold`;
+  return ratio >= 10 ? 'more than tenfold' : trText("about {v0}-fold", { v0: (Math.round(ratio)) });
 }
 
 /** "most" when the smallest share is at least a half, "nearly all" when it is at least 0.95, else "part". */

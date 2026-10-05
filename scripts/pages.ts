@@ -1,6 +1,6 @@
 /**
  * npm run build:pages — dist/ ready to host (the Pages workflow deploys it; any static host also works): the single-file
- * index.html, checked to be self-contained and within the 1.5 MB budget, plus .nojekyll so GitHub Pages serves it as is.
+ * index.html, checked to be self-contained and within the 1.5 MB budget, its social-preview image, and .nojekyll.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { selfContainedProblems } from './selfcontained';

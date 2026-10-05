@@ -5,7 +5,6 @@ import type { Job } from '../batch/sweep';
 import BatchWorker from '../batch/worker.ts?worker&inline';
 import { cloneConfig } from '../config/meta';
 import type { Config } from '../config/schema';
-import { MSG } from './labels';
 import { appliedListeners, batchRunning, controller, playing } from './store';
 
 export interface BatchState {
@@ -71,7 +70,8 @@ export async function startBatch(kind: BatchResult['kind'], jobs: Job[], setting
     if (!mine()) return null;
     ctl = null;
     batchRunning.value = false;
-    batch.value = { ...batch.value, status: 'failed', message: MSG.batchFailed(e instanceof Error ? e.message.replace(/^Batch failed: /, '') : String(e)) };
+    // Store the diagnostic, then format its reader-facing prefix in the current language at render time.
+    batch.value = { ...batch.value, status: 'failed', message: e instanceof Error ? e.message.replace(/^Batch failed: /, '') : String(e) };
     return null;
   }
 }

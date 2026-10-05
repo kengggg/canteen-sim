@@ -8,7 +8,7 @@ test('without WebGL the viewports explain it, numbers keep running, and nothing 
   const errors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto('http://localhost:4173/');
+  await page.goto('http://localhost:4173/?lang=en');
   await expect(page.getByText('The 3D view needs WebGL').first()).toBeVisible();
   await page.fill('#skip-to', '11:30');
   await page.getByRole('button', { name: 'Skip to' }).click();

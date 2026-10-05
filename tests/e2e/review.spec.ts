@@ -11,7 +11,7 @@ const hook = (page: Page) => page.evaluate(() => 0);
 void hook;
 
 test('C1: inside sandbox="allow-scripts", Skip to, Load settings code and Run batch work through the real buttons', async ({ page }) => {
-  await page.route('**/sandbox.html', (route) => route.fulfill({ contentType: 'text/html', body: '<iframe id="f" sandbox="allow-scripts" src="/index.html" style="width:1300px;height:950px"></iframe>' }));
+  await page.route('**/sandbox.html', (route) => route.fulfill({ contentType: 'text/html', body: '<iframe id="f" sandbox="allow-scripts" src="/index.html?lang=en" style="width:1300px;height:950px"></iframe>' }));
   await page.setViewportSize({ width: 1320, height: 980 });
   await page.goto('/sandbox.html');
   const f = page.frameLocator('#f');
@@ -29,7 +29,7 @@ test('C1: inside sandbox="allow-scripts", Skip to, Load settings code and Run ba
 });
 
 test('I2: batch results disappear when the live settings change, and the CSV uses the batch settings', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.getByRole('button', { name: 'Batch runs' }).click();
   await page.getByRole('button', { name: 'Run batch' }).click();
   await expect(page.getByText('Primary endpoints at 100% vs 0% reservation')).toBeVisible({ timeout: 120_000 });
@@ -43,7 +43,7 @@ test('I2: batch results disappear when the live settings change, and the CSV use
 });
 
 test('I4: releasing the A slider never starts a blocked configuration', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.locator('#set-layout-cols').fill('1');
   await page.locator('#set-layout-cols').press('Tab');
@@ -57,7 +57,7 @@ test('I4: releasing the A slider never starts a blocked configuration', async ({
 });
 
 test('I5: a slow drag orbits as far as a fast one', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.getByRole('button', { name: 'Jump to the simulator' }).click();
   const box = (await page.locator('.viewport').first().boundingBox())!;
   const yaw = () => page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.renderer()!.yaw);
@@ -79,7 +79,7 @@ test('I5: a slow drag orbits as far as a fast one', async ({ page }) => {
 });
 
 test('I6: follow mode with linked cameras keeps a target per canteen and picks a new group once one has left', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.locator('#skip-to').fill('12:00');
   await page.getByRole('button', { name: 'Skip to' }).click();
   await expect(page.locator('.clock')).toHaveText('12:00', { timeout: 60_000 });
@@ -96,7 +96,7 @@ test('I7: a touch tap shows the hover card', async ({ browser }) => {
   const ctx = await browser.newContext({ hasTouch: true, viewport: { width: 1280, height: 900 } });
   await ctx.addInitScript(DISMISSED);
   const page = await ctx.newPage();
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.locator('#skip-to').fill('12:10');
   await page.getByRole('button', { name: 'Skip to' }).click();
   await expect(page.locator('.clock')).toHaveText('12:10', { timeout: 60_000 });
@@ -112,7 +112,7 @@ test('I7: a touch tap shows the hover card', async ({ browser }) => {
 });
 
 test('I8: a host data-theme change recolours the 3D scene; I9: the free-seat count keeps 4.5:1 contrast in dark', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.getByRole('button', { name: 'Jump to the simulator' }).click();
   const box = (await page.locator('.viewport').first().boundingBox())!;
   const pixel = async () => {
@@ -135,7 +135,7 @@ test('I8: a host data-theme change recolours the 3D scene; I9: the free-seat cou
 });
 
 test('I10: repeated slider releases do not grow GPU textures or geometries', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   const info = () => page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.renderer()!.info);
   await page.waitForTimeout(300);
   await page.locator('#slider-a').focus();
@@ -154,7 +154,7 @@ test('I10: repeated slider releases do not grow GPU textures or geometries', asy
 test('context loss pauses the 3D view, the sim keeps running, and Restore brings it back without errors', async ({ page }) => {
   const errors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.evaluate(() => (window as unknown as { __canteen: { loseContext(): void } }).__canteen.loseContext());
   await expect(page.getByText('3D view paused').first()).toBeVisible();
   await page.getByRole('button', { name: 'Play' }).click();
@@ -165,7 +165,7 @@ test('context loss pauses the 3D view, the sim keeps running, and Restore brings
 });
 
 test('during a batch, Play and the A slider are disabled and the settings are read-only', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.getByRole('button', { name: 'Batch runs' }).click();
   await page.selectOption('#seed-count', '120');
   await page.getByRole('button', { name: 'Run batch' }).click();

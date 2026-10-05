@@ -1,3 +1,4 @@
+import { language, localise, msg as trText, rich } from '../i18n';
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type uPlot from 'uplot';
 import { pairMetrics } from '../sim/engine';
@@ -41,22 +42,22 @@ export function AdvantageStrip() {
   const done = controller.bothDone;
   const rows = useMemo(endpointRows, [minute, done, controller.generation]);
   return (
-    <section class="strip" aria-label={STRIP_TITLE}>
+    <section class="strip" aria-label={trText((STRIP_TITLE))}>
       <header class="strip-head">
-        <h2 class="eyebrow">{STRIP_TITLE}</h2>
-        <p class="muted strip-cap">{STRIP_CAPTION} {ADVANTAGE_HELP}</p>
+        <h2 class="eyebrow">{localise(STRIP_TITLE)}</h2>
+        <p class="muted strip-cap">{localise(STRIP_CAPTION)} {localise(ADVANTAGE_HELP)}</p>
       </header>
       <ul class="strip-cells">
-        {rows.map((r) => {
+        {localise(rows.map((r) => {
           const v = adv(r);
           return (
             <li key={r.id} class={`cell ${v === null ? '' : v > 0 ? 'pos' : v < 0 ? 'neg' : ''}`}>
-              <span class="cell-label">{r.label}</span>
-              <span class="cell-value num">{v === null ? '—' : `${v > 0 ? '+' : ''}${num(v, r.digits)} ${r.unit}`}</span>
-              <span class="cell-sub num muted">A {r.a === null ? '—' : num(r.a * r.scale, r.digits)} · B {r.b === null ? '—' : num(r.b * r.scale, r.digits)}</span>
+              <span class="cell-label">{localise(r.label)}</span>
+              <span class="cell-value num">{localise(v === null ? '—' : `${v > 0 ? '+' : ''}${num(v, r.digits)} ${trText(r.unit)}`)}</span>
+              <span class="cell-sub num muted">{rich("A {v0} · B {v1}", { v0: (r.a === null ? '—' : num(r.a * r.scale, r.digits)), v1: (r.b === null ? '—' : num(r.b * r.scale, r.digits)) })}</span>
             </li>
           );
-        })}
+        }))}
       </ul>
     </section>
   );
@@ -85,30 +86,27 @@ function SeriesPanel({ side }: { side: 0 | 1 }) {
     const x = Array.from({ length: minutes }, (_, i) => i);
     const layers = STACK.map((st) => x.map((i) => s.states[i * 6 + st]));
     chart.current?.destroy();
-    chart.current = stackedChart(node, x.length ? x : [0], x.length ? layers : STACK.map(() => [0]), STACK.map((st) => token(`--seat-${st}`)), STACK.map((st) => SEAT_LABELS[st]), seats, (v) => clock(cfg.crowd.windowStart, v * 60_000), shade);
+    chart.current = stackedChart(node, x.length ? x : [0], x.length ? layers : STACK.map(() => [0]), STACK.map((st) => token(`--seat-${st}`)), STACK.map((st) => trText(SEAT_LABELS[st])), seats, (v) => clock(cfg.crowd.windowStart, v * 60_000), shade);
     return () => { chart.current?.destroy(); chart.current = null; };
-  }, [minutes, shade, table, controller.generation, themeGen.value]);
+  }, [minutes, shade, table, controller.generation, themeGen.value, language.value]);
 
   return (
     <figure class="series">
-      <figcaption>
-        <span class="pane-key">{side === 0 ? 'A' : 'B'}</span> Seat states over time
-        <button type="button" class="linklike" onClick={() => setTable(!table)} aria-pressed={table}>{table ? 'Show chart' : 'Show table'}</button>
-      </figcaption>
-      {table ? (
+      <figcaption>{rich("{v0} Seat states over time{v1}", { v0: (<span class="pane-key">{localise(side === 0 ? 'A' : 'B')}</span>), v1: (<button type="button" class="linklike" onClick={() => setTable(!table)} aria-pressed={table}>{localise(table ? 'Show chart' : 'Show table')}</button>) })}</figcaption>
+      {localise(table ? (
         <div class="table-scroll">
           <table class="data">
-            <thead><tr><th scope="col">Time</th>{STACK.map((st) => <th scope="col" key={st}>{SEAT_LABELS[st]}</th>)}</tr></thead>
+            <thead><tr><th scope="col">{trText("Time")}</th>{localise(STACK.map((st) => <th scope="col" key={st}>{localise(SEAT_LABELS[st])}</th>))}</tr></thead>
             <tbody>
-              {Array.from({ length: minutes }, (_, i) => (
-                <tr key={i}><th scope="row" class="num">{clock(cfg.crowd.windowStart, i * 60_000)}</th>{STACK.map((st) => <td class="num" key={st}>{num(s.states[i * 6 + st], 1)}</td>)}</tr>
-              ))}
+              {localise(Array.from({ length: minutes }, (_, i) => (
+                <tr key={i}><th scope="row" class="num">{localise(clock(cfg.crowd.windowStart, i * 60_000))}</th>{localise(STACK.map((st) => <td class="num" key={st}>{localise(num(s.states[i * 6 + st], 1))}</td>))}</tr>
+              )))}
             </tbody>
           </table>
         </div>
       ) : (
-        <div ref={el} class="chart" role="img" aria-label={`Seat states over time in canteen ${side === 0 ? 'A' : 'B'}`} />
-      )}
+        <div ref={el} class="chart" role="img" aria-label={trText((trText("Seat states over time in canteen {v0}", { v0: (side === 0 ? 'A' : 'B') })))} />
+      ))}
     </figure>
   );
 }

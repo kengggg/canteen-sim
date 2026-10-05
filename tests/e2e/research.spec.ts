@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 test('separate role results explain the mechanism and keep Model 2 live settings intact', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const research = page.getByRole('region', { name: 'Why does seeing farther change the result?', exact: true });
   await page.getByRole('button', { name: 'Investigate visibility', exact: true }).click();
   await expect(research.getByRole('heading', { name: 'Why does seeing farther change the result?', exact: true })).toBeFocused();
@@ -26,7 +26,7 @@ test('separate role results explain the mechanism and keep Model 2 live settings
 });
 
 test('research downloads contain the complete protocol and report', async ({ page }) => {
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const research = page.locator('.research');
   await research.getByText('Research protocol and complete results', { exact: true }).click();
   for (const [button, filename, path] of [
@@ -44,7 +44,7 @@ test('research downloads contain the complete protocol and report', async ({ pag
 });
 
 test('keyboard navigation returns to its opener and Escape in a select preserves the panel', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   const opener = page.getByRole('button', { name: 'Read the full findings', exact: true });
   await opener.focus();
   await page.keyboard.press('Enter');
@@ -65,7 +65,7 @@ test('keyboard navigation returns to its opener and Escape in a select preserves
 
 test('research controls and table scroll regions work at 320 px with no page overflow', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 844 });
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const research = page.locator('.research');
   await research.getByRole('button', { name: 'Only food-searchers see 20 m', exact: true }).click();
   await expect(research.locator('.research-detail h4')).toContainText('Only food-searchers see 20 m');

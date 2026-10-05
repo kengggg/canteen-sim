@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('the assumption comparison updates its evidence and loads the matching live lunch', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   const story = page.getByRole('region', { name: 'Does saving a table help everyone get lunch?' });
   await expect(story).toContainText('21.4');
   await page.getByRole('radio', { name: 'Queues only', exact: true }).check();
@@ -15,7 +15,7 @@ test('the assumption comparison updates its evidence and loads the matching live
 });
 
 test('the live estimate follows computed levels and declines to interpolate other levels', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await expect(page.locator('.evidence-line')).toContainText('50% reserving: 20.2%');
   const slider = page.getByRole('slider');
   await slider.press('Home');
@@ -28,7 +28,7 @@ test('the live estimate follows computed levels and declines to interpolate othe
 
 test('paused charts fit after desktop-to-phone resize and after resizing back', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await expect(page.locator('.series .uplot')).toHaveCount(2);
   for (const width of [390, 320, 1280]) {
     await page.setViewportSize({ width, height: 844 });
@@ -38,7 +38,7 @@ test('paused charts fit after desktop-to-phone resize and after resizing back', 
 });
 
 test('shared settings open the requested live lunch instead of the default story example', async ({ page }) => {
-  await page.goto('/#v=1&m=2&seed=7&crowd.totalPeople=900&reserve.percentA=0.25');
+  await page.goto('/?lang=en#v=1&m=2&seed=7&crowd.totalPeople=900&reserve.percentA=0.25');
   await expect(page.locator('#simulation')).toBeFocused();
   await expect(page.getByRole('slider')).toHaveValue('25');
   await expect(page.locator('.evidence-line')).toContainText('No built-in estimate for these settings');

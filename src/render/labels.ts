@@ -1,7 +1,8 @@
+import { language, messageIn, type Language } from '../i18n';
 import { CanvasTexture, LinearFilter, Sprite, SpriteMaterial, type Texture } from 'three';
 
 const ROW = 72; // px per row at 2× resolution
-const FONT = `600 44px system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif`;
+const font = (lang: Language) => `600 44px ${lang === 'th' ? "'Noto Sans Thai Looped', " : ''}system-ui, -apple-system, 'Segoe UI', Roboto, 'Leelawadee UI', Thonburi, Tahoma, Arial, sans-serif`;
 const PAD = 12;
 
 interface Entry { x: number; y: number; w: number }
@@ -21,10 +22,12 @@ export class LabelAtlas {
   constructor(private readonly texts: string[], color: string) {
     this.canvas = document.createElement('canvas');
     const ctx = this.canvas.getContext('2d')!;
-    ctx.font = FONT;
     let x = 0, y = 0;
     for (const t of new Set(texts)) {
-      const w = Math.ceil(ctx.measureText(t).width) + 2 * PAD;
+      const w = Math.ceil(Math.max(...(['en', 'th'] as const).map((lang) => {
+        ctx.font = font(lang);
+        return ctx.measureText(messageIn(lang, t)).width;
+      }))) + 2 * PAD;
       if (x + w > this.W) { x = 0; y += ROW; }
       this.entries.set(t, { x, y, w });
       x += w;
@@ -42,10 +45,10 @@ export class LabelAtlas {
   draw(color: string): void {
     const ctx = this.canvas.getContext('2d')!;
     ctx.clearRect(0, 0, this.W, this.H);
-    ctx.font = FONT;
+    ctx.font = font(language.value);
     ctx.textBaseline = 'middle';
     ctx.fillStyle = color;
-    for (const [t, e] of this.entries) ctx.fillText(t, e.x + PAD, e.y + ROW / 2);
+    for (const [t, e] of this.entries) ctx.fillText(messageIn(language.value, t), e.x + PAD, e.y + ROW / 2);
     this.texture.needsUpdate = true;
     for (const c of this.clones) c.needsUpdate = true;
   }

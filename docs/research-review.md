@@ -2,6 +2,20 @@
 
 This is a simulation research release for a general audience. It asks when and why reservation helps or harms the whole canteen. There is no real pilot, empirical calibration, participant recruitment or human comprehension study. This review combines source inspection, a structured explanation walkthrough, browser interaction checks and automated tests.
 
+## Thai localisation addendum
+
+The interface and its protocol/complete-results downloads now support Thai and English. The Thai documents
+are generated from the English originals through a separate prose catalogue; checks preserve every number,
+table row, code identifier and source link. Model 2, the separate experiment, all numerical evidence and their
+identities remain unchanged. Neither translation nor interface checks add empirical validation.
+
+The localisation walkthrough checks both door-rule explanations, uncertainty, benefit/harm directions,
+research selections, language changes during a paused lunch or running batch, numerical export parity,
+downloads, blocked storage/copying, narrow layouts and keyboard navigation. Final local checks passed:
+276 unit tests, 181 model-sanity checks and all 79 Chromium/WebKit browser cases. Firefox could not launch
+on this Mac and remains required in Linux CI. See [the current design review](../design-qa.md) for screenshots,
+corrections, build size and exact verification limits. The prior numerical study and review below remain intact.
+
 ## Research conclusions
 
 The original Model 2 baseline is retained. Its 36-setting sensitivity study contains 3,240 runs and all 72 planned comparisons. The separately versioned `visibility-roles-v1` follow-up contains 600 unique runs, 16 comparisons and 28 predefined contrasts on 30 fresh seeds. It isolates the two roles previously changed together by one visibility setting.

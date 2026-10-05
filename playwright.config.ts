@@ -15,7 +15,7 @@ export default defineConfig({
     { name: 'chromium', use: { ...devices['Desktop Chrome'], ...swiftshader } },
     // Playwright's Firefox build fails to launch on some macOS versions ("Could not find profile folder");
     // set CANTEEN_E2E_FIREFOX=0 to skip it there.
-    ...(process.env.CANTEEN_E2E_FIREFOX === '0' ? [] : [{ name: 'firefox', use: { ...devices['Desktop Firefox'] }, testMatch: /(golden|story|sensitivity|research)\.spec\.ts/ }]),
-    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testMatch: /(golden|story|sensitivity|research)\.spec\.ts/ },
+    ...(process.env.CANTEEN_E2E_FIREFOX === '0' ? [] : [{ name: 'firefox', use: { ...devices['Desktop Firefox'] }, testMatch: /(golden|story|sensitivity|research|localisation)\.spec\.ts/ }]),
+    { name: 'webkit', use: { ...devices['Desktop Safari'] }, testMatch: /(golden|story|sensitivity|research|localisation)\.spec\.ts/ },
   ],
 });

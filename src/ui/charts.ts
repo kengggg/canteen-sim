@@ -12,6 +12,7 @@ const axis = () => ({
   grid: { stroke: token('--line'), width: 1 },
   ticks: { stroke: token('--line'), width: 1 },
   font: `12px ${token('--font') || 'system-ui'}`,
+  labelFont: `bold 12px ${token('--font') || 'system-ui'}`,
 });
 
 /** Resize existing plots when their container changes, including while playback is paused. */

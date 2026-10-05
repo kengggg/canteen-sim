@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('the explorer loads a tested visibility setting and the live estimate follows it', async ({ page }) => {
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const explorer = page.getByRole('region', { name: 'What changes the result?', exact: true });
   await explorer.getByRole('button', { name: 'See tables within 20 metres', exact: true }).click();
   await expect(explorer.locator('.sensitivity-detail')).toContainText('16.9 out of 100 leave under free flow; 37.9 with reservation');
@@ -17,7 +17,7 @@ test('the explorer loads a tested visibility setting and the live estimate follo
 });
 
 test('combined assumptions retain both axes and distinguish an unclear difference at 50%', async ({ page }) => {
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const explorer = page.getByRole('region', { name: 'What changes the result?', exact: true });
   await explorer.getByRole('combobox', { name: 'Assumption to explore', exact: true }).selectOption('doorCrowd');
   await explorer.getByRole('combobox', { name: 'Groups reserving in A', exact: true }).selectOption('0.5');
@@ -28,7 +28,7 @@ test('combined assumptions retain both axes and distinguish an unclear differenc
 });
 
 test('near-zero intervals keep their sign', async ({ page }) => {
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const explorer = page.getByRole('region', { name: 'What changes the result?', exact: true });
   await explorer.getByRole('combobox', { name: 'Assumption to explore', exact: true }).selectOption('doorService');
   await explorer.getByRole('button', { name: '60 seconds per serving; ignore seating', exact: true }).click();
@@ -37,7 +37,7 @@ test('near-zero intervals keep their sign', async ({ page }) => {
 
 test('the phone explorer keeps page controls within the viewport', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const body = page.locator('.drawer-findings .drawer-body');
   await expect(body).toBeVisible();
   for (const width of [390, 320]) {

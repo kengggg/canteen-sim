@@ -1,3 +1,4 @@
+import { language, localise, msg as trText } from '../i18n';
 import { useEffect, useMemo, useRef } from 'preact/hooks';
 import { orbitBy, panBy, zoomBy } from '../render/cameras';
 import { CanteenRenderer, type Rect } from '../render/scene';
@@ -144,10 +145,10 @@ export function Stage() {
   // Theme tokens change with data-theme (ours or the host's) or the system scheme; see App's observer.
   useEffect(() => {
     requestAnimationFrame(() => renderer?.applyTheme());
-  }, [themeGen.value]);
+  }, [themeGen.value, language.value]);
 
   return (
-    <section class="stage" id="simulation" tabIndex={-1} aria-label="Canteens">
+    <section class="stage" id="simulation" tabIndex={-1} aria-label={trText("Canteens")}>
       <ViewControls />
       <canvas ref={canvasRef} class="stage-canvas" aria-hidden="true" />
       <Pane side={0} />
@@ -161,32 +162,32 @@ function Pane({ side }: { side: 0 | 1 }) {
   const e = side === 0 ? controller.A : controller.B;
   const cfg = applied.value;
   const status = e.done ? (e.truncated ? MSG.truncated(clock(cfg.crowd.windowStart, e.nowMs)) : MSG.finished(clock(cfg.crowd.windowStart, e.nowMs))) : null;
-  const leftAt = cameraMode.value === 'follow' && followed && followed.leftAt[side] >= 0 ? `Left at ${clock(cfg.crowd.windowStart, followed.leftAt[side])}` : null;
+  const leftAt = cameraMode.value === 'follow' && followed && followed.leftAt[side] >= 0 ? trText("Left at {v0}", { v0: (clock(cfg.crowd.windowStart, followed.leftAt[side])) }) : null;
   const handlers = usePointerHandlers(side);
   return (
     <div class={`pane pane-${side === 0 ? 'a' : 'b'}`}>
       <header class="pane-head">
         <h2 class="pane-title">
-          <span class="pane-key">{side === 0 ? 'A' : 'B'}</span>
-          {side === 0 ? CANTEEN_A.slice(4) : CANTEEN_B.slice(4)}
+          <span class="pane-key">{localise(side === 0 ? 'A' : 'B')}</span>
+          {localise(side === 0 ? CANTEEN_A.slice(4) : CANTEEN_B.slice(4))}
         </h2>
-        {side === 0 ? <ASlider /> : <p class="pane-sub muted">Everyone buys food first, then finds a seat.</p>}
+        {localise(side === 0 ? <ASlider /> : <p class="pane-sub muted">{trText("Everyone buys food first, then finds a seat.")}</p>)}
       </header>
       <div class="viewport-wrap">
         <div
           class="viewport"
           role="img"
-          aria-label={side === 0 ? 'Canteen A: 3D view of the reservation canteen' : 'Canteen B: 3D view of the free-flow canteen'}
+          aria-label={trText((side === 0 ? 'Canteen A: 3D view of the reservation canteen' : 'Canteen B: 3D view of the free-flow canteen'))}
           {...handlers}
         />
-        {webgl.value === 'none' && <p class="viewport-msg">{MSG.noWebgl}</p>}
-        {webgl.value === 'lost' && (
+        {localise(webgl.value === 'none' && <p class="viewport-msg">{localise(MSG.noWebgl)}</p>)}
+        {localise(webgl.value === 'lost' && (
           <p class="viewport-msg">
-            {MSG.contextLost} — <button type="button" class="linklike" onClick={() => renderer?.restoreContext()}>{MSG.restore}</button>
+            {localise(MSG.contextLost)} — <button type="button" class="linklike" onClick={() => renderer?.restoreContext()}>{localise(MSG.restore)}</button>
           </p>
-        )}
-        {status && <p class="viewport-status">{status}</p>}
-        {leftAt && <p class="viewport-status viewport-status-2">{leftAt}</p>}
+        ))}
+        {localise(status && <p class="viewport-status">{localise(status)}</p>)}
+        {localise(leftAt && <p class="viewport-status viewport-status-2">{localise(leftAt)}</p>)}
       </div>
       <Legend />
     </div>

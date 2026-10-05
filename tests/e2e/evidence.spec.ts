@@ -6,7 +6,7 @@ const evidence = JSON.parse(readFileSync(new URL('../../src/generated/evidence.j
 
 test('the embedded evidence hashes equal a fresh 150-run sweep in the browser', async ({ page }) => {
   test.setTimeout(600_000);
-  await page.goto('/');
+  await page.goto('/?lang=en');
   const r = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.batch(30));
   const fresh = new Map(r.hashes);
   expect(fresh.size).toBe(150);

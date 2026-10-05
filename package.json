@@ -20,8 +20,11 @@
     "test:e2e": "playwright test",
     "golden:update": "vite-node scripts/golden.ts",
     "build:artifact": "npm run build && vite-node scripts/artifact.ts",
-    "build:pages": "vite build && vite-node scripts/pages.ts",
-    "bcheck": "vite-node scripts/bcheck.ts"
+    "build:pages": "npm run localise && vite build && vite-node scripts/pages.ts",
+    "bcheck": "vite-node scripts/bcheck.ts",
+    "localise": "vite-node scripts/localise.ts",
+    "predev": "npm run localise",
+    "prebuild": "npm run localise"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

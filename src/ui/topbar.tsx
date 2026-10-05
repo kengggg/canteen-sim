@@ -1,3 +1,5 @@
+import { localise, msg as trText, rich } from '../i18n';
+import { LanguagePicker } from './language';
 import { useState } from 'preact/hooks';
 import { PRESETS } from '../config/presets';
 import { cloneConfig } from '../config/meta';
@@ -31,19 +33,19 @@ function Skip() {
     tick.value++;
   };
   return (
-    <div class="skip" role="group" aria-label="Skip to">
-      <label for="skip-to" class="sr-only">Skip to time</label>
-      {busy ? (
+    <div class="skip" role="group" aria-label={trText("Skip to")}>
+      <label for="skip-to" class="sr-only">{trText("Skip to time")}</label>
+      {localise(busy ? (
         <>
-          <span class="num muted">Skipping… {Math.round((job!.progress || 0) * 100)}%</span>
-          <button type="button" onClick={() => { job!.cancel(); tick.value++; }}>Cancel</button>
+          <span class="num muted">{rich("Skipping… {v0}%", { v0: (Math.round((job!.progress || 0) * 100)) })}</span>
+          <button type="button" onClick={() => { job!.cancel(); tick.value++; }}>{trText("Cancel")}</button>
         </>
       ) : (
         <>
           <input id="skip-to" class="num" inputMode="numeric" size={5} value={value} onInput={(e) => setValue((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); go(); } }} />
-          <button type="button" onClick={go}>Skip to</button>
+          <button type="button" onClick={go}>{trText("Skip to")}</button>
         </>
-      )}
+      ))}
     </div>
   );
 }
@@ -58,9 +60,10 @@ export function TopBar() {
   return (
     <header class="topbar">
       <div class="topbar-row">
-        <h2 class="brand">{APP_TITLE}</h2>
+        <h2 class="brand">{localise(APP_TITLE)}</h2>
+        <LanguagePicker />
         <label class="preset" for="preset">
-          <span class="sr-only">Scenario</span>
+          <span class="sr-only">{trText("Scenario")}</span>
           <select
             id="preset"
             value={PRESETS.find((p) => { const c = defaultConfig(); p.apply(c); c.seed = pending.value.seed; return JSON.stringify(c) === JSON.stringify(pending.value); })?.id ?? ''}
@@ -73,39 +76,39 @@ export function TopBar() {
               pending.value = cloneConfig(c);
             }}
           >
-            <option value="" disabled>Custom settings</option>
-            {PRESETS.map((p) => <option key={p.id} value={p.id} title={p.help}>{p.label}</option>)}
+            <option value="" disabled>{trText("Custom settings")}</option>
+            {localise(PRESETS.map((p) => <option key={p.id} value={p.id} title={trText((p.help))}>{localise(p.label)}</option>))}
           </select>
         </label>
         <div class="transport">
-          <button type="button" class="primary" aria-label={playing.value ? ARIA.pause : ARIA.play} onClick={togglePlay} disabled={controller.bothDone || batchRunning.value}>
-            {playing.value ? '❚❚ Pause' : '▶ Play'}
+          <button type="button" class="primary" aria-label={trText((playing.value ? ARIA.pause : ARIA.play))} onClick={togglePlay} disabled={controller.bothDone || batchRunning.value}>
+            {localise(playing.value ? '❚❚ Pause' : '▶ Play')}
           </button>
-          <button type="button" onClick={restart}>Restart</button>
+          <button type="button" onClick={restart}>{trText("Restart")}</button>
           <label for="speed" class="speed">
-            <span class="sr-only">Speed</span>
+            <span class="sr-only">{trText("Speed")}</span>
             <select id="speed" value={speed.value} onChange={(e) => { speed.value = Number((e.target as HTMLSelectElement).value); controller.speed = speed.value; }}>
-              {SPEEDS.map((s) => <option key={s} value={s}>{s}×</option>)}
+              {localise(SPEEDS.map((s) => <option key={s} value={s}>{localise(s)}×</option>))}
             </select>
           </label>
-          <span class="clock num" aria-live="off">{clock(cfg.crowd.windowStart, controller.tickNow)}</span>
-          {controller.runningAt !== null && <span class="running muted">{MSG.runningAt(controller.runningAt)}</span>}
+          <span class="clock num" aria-live="off">{localise(clock(cfg.crowd.windowStart, controller.tickNow))}</span>
+          {localise(controller.runningAt !== null && <span class="running muted">{localise(MSG.runningAt(controller.runningAt))}</span>)}
           <Skip />
         </div>
-        <nav class="tools" aria-label="Panels">
-          <button type="button" onClick={() => toggleDrawer('findings')} aria-pressed={drawer.value === 'findings'}>Findings</button>
-          <button type="button" onClick={() => toggleDrawer('assumptions')} aria-pressed={drawer.value === 'assumptions'}>Assumptions</button>
-          <button type="button" aria-label={ARIA.settings} title={ARIA.settings} onClick={() => toggleDrawer('settings')} aria-pressed={drawer.value === 'settings'}>⚙</button>
-          <button type="button" aria-label={ARIA.batch} title={ARIA.batch} onClick={() => toggleDrawer('batch')} aria-pressed={drawer.value === 'batch'}>📊</button>
-          <button type="button" aria-label={ARIA.howto} title={ARIA.howto} onClick={() => (howto.value = true)}>?</button>
-          <button type="button" aria-label={`${ARIA.theme}: ${theme.value}`} title={`Theme: ${theme.value}`} onClick={() => (theme.value = THEME_NEXT[theme.value])}>◐</button>
+        <nav class="tools" aria-label={trText("Panels")}>
+          <button type="button" onClick={() => toggleDrawer('findings')} aria-pressed={drawer.value === 'findings'}>{trText("Findings")}</button>
+          <button type="button" onClick={() => toggleDrawer('assumptions')} aria-pressed={drawer.value === 'assumptions'}>{trText("Assumptions")}</button>
+          <button type="button" aria-label={trText((ARIA.settings))} title={trText((ARIA.settings))} onClick={() => toggleDrawer('settings')} aria-pressed={drawer.value === 'settings'}>⚙</button>
+          <button type="button" aria-label={trText((ARIA.batch))} title={trText((ARIA.batch))} onClick={() => toggleDrawer('batch')} aria-pressed={drawer.value === 'batch'}>📊</button>
+          <button type="button" aria-label={trText((ARIA.howto))} title={trText((ARIA.howto))} onClick={() => (howto.value = true)}>?</button>
+          <button type="button" aria-label={trText((trText("Theme: {v0}", { v0: theme.value })))} title={trText((trText("Theme: {v0}", { v0: (theme.value) })))} onClick={() => (theme.value = THEME_NEXT[theme.value])}>◐</button>
         </nav>
       </div>
       <p class="evidence-line">
-        {evidence
-          ? <><b>{evidence.n}-lunch model estimate · {fraction}% reserving:</b> {num(evidence.left.a, 1)}% left without eating in A, {num(evidence.left.b, 1)}% in B. </>
-          : <><b>Live comparison · {fraction}% reserving:</b> {fraction === 0 ? 'Both canteens use free flow. ' : 'No built-in estimate for these settings. '}</>}
-        <button type="button" class="linklike" onClick={() => { evidenceOpen.value = hasDefaultSettings(cfg); openDrawer('batch'); }}>Compare lunches</button>
+        {localise(evidence
+          ? <>{rich("{v0} {v1}% left without eating in A, {v2}% in B. ", { v0: (<b>{rich("{v0}-lunch model estimate · {v1}% reserving:", { v0: (evidence.n), v1: (fraction) })}</b>), v1: (num(evidence.left.a, 1)), v2: (num(evidence.left.b, 1)) })}</>
+          : <><b>{rich("Live comparison · {v0}% reserving:", { v0: (fraction) })}</b> {localise(fraction === 0 ? 'Both canteens use free flow. ' : 'No built-in estimate for these settings. ')}</>)}
+        <button type="button" class="linklike" onClick={() => { evidenceOpen.value = hasDefaultSettings(cfg); openDrawer('batch'); }}>{trText("Compare lunches")}</button>
       </p>
     </header>
   );

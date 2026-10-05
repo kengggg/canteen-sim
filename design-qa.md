@@ -1,6 +1,87 @@
 # Canteen Sim implementation review — 2026-10-05
 
-## Latest review: research-only study and explanation walkthrough
+## Latest review: Thai default and Noto Sans Thai Looped
+
+**Passed locally in Chromium and WebKit.** Thai is now the default for new visitors, including browsers
+whose primary language is English. Explicit language links and saved choices still override the default.
+Noto Sans Thai Looped is embedded in the single HTML file, including its licence metadata, so Thai text
+does not depend on a local font installation or an external request. The regular face is bundled and the
+browser synthesises heavier weights to retain the 1.5 MiB budget. Charts and scene labels use the same face;
+canvas label measurement waits for it to load.
+
+Desktop and 320 px screenshots are in `/private/tmp/canteen-thai-20261005/`:
+`thai-looped-opening.png`, `thai-looped-phone.png`, and `thai-looped-charts.png`. WebKit exposed insufficient
+space between direct chart labels with the new font; a 22 px gap passes both engines at 320, 390 and 1280 px.
+Temporary viewport overrides were reset after inspection.
+
+Validation: 276 unit tests passed. All 79 Chromium/WebKit browser cases passed across the suite runs and
+targeted reruns: the chart-spacing regression and the sandbox test's URL lookup were fixed and rechecked.
+Fresh English-browser contexts verify the Thai default, stored English preference, and explicit link priority.
+Offline checks verify the embedded font is loaded without external font requests. English tests now request
+English explicitly. Lint, TypeScript, translation freshness and `git diff --check` passed.
+The self-contained build is **1,562,787 bytes (1.490 MiB)**, below the 1.5 MiB limit. No deployment was made.
+The Firefox launch limitation recorded below still applies; this follow-up does not claim a Firefox run.
+
+## Previous review: Thai localisation
+
+**Final result: passed locally in Chromium and WebKit.**
+
+Scope: the complete reader interface, controls, accessible names, errors, findings, assumption explanations,
+batch wording, chart labels, 3D signs and both research-document downloads. The existing English interface is
+retained. This is a structured implementation walkthrough and automated review, without human participants,
+real-world canteen measurements or a pilot.
+
+The language selector is visible in the opening and simulator toolbar. An explicit `?lang=th` or `?lang=en`
+overrides the saved choice; otherwise the primary browser language chooses Thai or English. Storage and clipboard
+failures retain working in-memory selection and a complete document copy fallback. Changing language preserves
+the paused lunch, camera, live counts, pending settings and selected research comparison. Running batches and
+completed check results follow the selected language. User-entered scenario names remain literal.
+
+### Walkthrough and corrections
+
+| Task | Verified result |
+|---|---|
+| Read the opening and change the door assumption | Thai distinguishes an unclear difference from equal outcomes and preserves the unvalidated-model limitation. |
+| Continue a paused simulation after changing language | Clock, camera, settings and numeric counters remain unchanged; scene signs change language. |
+| Explore findings and the separate role experiment | All selected cases and estimates persist; signs, percentage-point units and intervals retain their meaning. |
+| Run a batch and change language | The 150-run check completes, retains results and updates its status in both languages. |
+| Download settings and research documents | JSON remains byte-identical; protocol/report match the complete selected-language files. |
+| Use a narrow screen or keyboard | No page overflow at 320 px; research controls remain at least 44 px; Escape returns focus to the opener. |
+| Use the self-contained app offline | Chromium opens the file with networking disabled; WebKit continues after disconnection without additional requests. |
+
+Visual review found and fixed overlapping Thai stacked-chart categories, clipped final time labels caused by a
+240 px chart minimum, and insufficient spacing between Thai direct labels. Thai stacked bars now use 0–100% axis
+labels with an explicit 0% explanation in the caption; table headings and accessible descriptions retain the full
+meaning. Direct labels have room for vowels and tone marks. Two missed cohort-table labels were translated.
+Completed batch notices are formatted at render time so they do not retain an old language.
+
+### Final evidence
+
+Screenshots of the built app are under `/private/tmp/canteen-thai-20261005/`: `desktop-opening.png`,
+`desktop-english.png`, `desktop-charts.png`, `phone-opening.png` and `narrow-chart.png`. Desktop CSS viewport
+1280 × 1323; phone widths 390 and 320 px at 844 px height. Temporary viewport overrides were reset. Thai word
+wrapping, tone marks, full control names, readable estimates and chart boundaries were inspected. The same
+chart bounds and label separation pass automated checks at 320, 390 and 1280 px in both tested browser engines.
+
+- 1,005 UI messages and 92 research prose templates; compact keys have no collisions and placeholders match.
+- 276 unit tests and 181 model-sanity checks passed. The sanity suite retains the documented expected failure
+  of the original median-time hypothesis; localisation does not change that scientific result.
+- Final complete Chromium/WebKit suite: **79 passed**. This includes all 18 new localisation cases, existing
+  golden hashes, fresh evidence reproduction, worker/fallback paths and English interface regressions.
+- Lint, TypeScript, generated-translation freshness and `git diff --check` passed.
+- Self-contained build: **1,547,055 bytes (1.475 MiB)**, below the 1.5 MiB limit. No external fonts or catalogues.
+- Engine/configuration sources, experiment plans, generated numerical evidence, audits and golden hashes are
+  unchanged. Language parity checks reproduce identical run hashes, CSV values and settings JSON. Thai reader
+  documents preserve every numerical value, table row, code identifier and source link from the English files.
+
+Firefox was attempted but failed before loading a page with `Could not find profile folder` on this Mac; Linux CI
+retains Firefox, including the localisation tests, as a required check. Playwright WebKit cannot begin file/offline
+navigation here, so its offline check supplies the same HTML through a route and then disconnects. Raw technical
+diagnostics, identifiers and reproduction commands remain exact; their reader-facing explanations are translated.
+Local checks used Node 26.10.0; CI remains pinned to Node 22. No physical-device, screen-reader or participant
+certification, remote push or deployment is claimed.
+
+## Previous review: research-only study and explanation walkthrough
 
 **Final result: passed**
 

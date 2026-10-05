@@ -1,3 +1,4 @@
+import { localise, msg as trText } from '../i18n';
 import type { Live } from '../sim/engine';
 import { int, num } from './format';
 import { COUNTERS, SEAT_LABELS } from './labels';
@@ -7,25 +8,25 @@ const SEAT_ORDER = [5, 4, 3, 1, 2, 0]; // occupied, held, claimedEmpty, openToSm
 
 function SeatBar({ live, seats }: { live: Live; seats: number }) {
   return (
-    <div class="seatbar" role="img" aria-label={SEAT_ORDER.map((s) => `${SEAT_LABELS[s]}: ${live.seatsByState[s]}`).join(', ')}>
+    <div class="seatbar" role="img" aria-label={trText((SEAT_ORDER.map((s) => `${trText(SEAT_LABELS[s])}: ${live.seatsByState[s]}`).join(', ')))}>
       <div class="seatbar-track">
-        {SEAT_ORDER.map((s) => {
+        {localise(SEAT_ORDER.map((s) => {
           const n = live.seatsByState[s];
           const w = (100 * n) / seats;
           return n > 0 ? (
-            <span key={s} class="seatbar-seg" style={{ width: `${w}%`, background: `var(--seat-${s})` }} title={`${SEAT_LABELS[s]}: ${n}`}>
-              {w > 9 ? <span class="seatbar-n num" style={s === 0 ? { color: 'var(--ink)' } : undefined}>{n}</span> : null}
+            <span key={s} class="seatbar-seg" style={{ width: `${w}%`, background: `var(--seat-${s})` }} title={trText((`${trText(SEAT_LABELS[s])}: ${n}`))}>
+              {localise(w > 9 ? <span class="seatbar-n num" style={s === 0 ? { color: 'var(--ink)' } : undefined}>{localise(n)}</span> : null)}
             </span>
           ) : null;
-        })}
+        }))}
       </div>
       <ul class="seatbar-key">
-        {SEAT_ORDER.map((s) => (
+        {localise(SEAT_ORDER.map((s) => (
           <li key={s}>
             <span class="sw" style={{ background: `var(--seat-${s})` }} />
-            {SEAT_LABELS[s]} <b class="num">{live.seatsByState[s]}</b>
+            {localise(SEAT_LABELS[s])} <b class="num">{localise(live.seatsByState[s])}</b>
           </li>
-        ))}
+        )))}
       </ul>
     </div>
   );
@@ -37,15 +38,15 @@ function values(live: Live, isA: boolean): string[] {
     int(live.searchingWithFood),
     isA ? int(live.claiming) : '—',
     int(live.standingWithFood),
-    `${int(live.left)} (door ${int(live.leftDoor)} · queue ${int(live.leftQueue)})`,
+    trText("{v0} (door {v1} · queue {v2})", { v0: (int(live.left)), v1: (int(live.leftDoor)), v2: (int(live.leftQueue)) }),
     int(live.sitStartsLast60),
-    live.entranceToSeatMeanMin === null ? '—' : `${num(live.entranceToSeatMeanMin, 1)} min`,
+    live.entranceToSeatMeanMin === null ? '—' : trText("{v0} min", { v0: (num(live.entranceToSeatMeanMin, 1)) }),
   ];
 }
 
 function Info({ text }: { text: string }) {
   return (
-    <button type="button" class="info" aria-label={text} title={text}>
+    <button type="button" class="info" aria-label={trText((text))} title={trText((text))}>
       ⓘ
     </button>
   );
@@ -58,39 +59,39 @@ export function LiveStats() {
   const seats = controller.A.layout.seats.length;
   const vA = values(A, true), vB = values(B, false);
   return (
-    <section class="live" aria-label="Live counters">
-      {[A, B].map((live, side) => (
+    <section class="live" aria-label={trText("Live counters")}>
+      {localise([A, B].map((live, side) => (
         <div class={`live-col live-${side === 0 ? 'a' : 'b'}`} key={side}>
           <SeatBar live={live} seats={seats} />
           <dl class="counters">
-            {COUNTERS.map((c, i) => (
+            {localise(COUNTERS.map((c, i) => (
               <div class="counter" key={c.id}>
-                <dt>{c.label} <Info text={c.help} /></dt>
-                <dd class="num">{(side === 0 ? vA : vB)[i]}</dd>
+                <dt>{localise(c.label)} <Info text={trText((c.help))} /></dt>
+                <dd class="num">{localise((side === 0 ? vA : vB)[i])}</dd>
               </div>
-            ))}
+            )))}
           </dl>
         </div>
-      ))}
+      )))}
       <table class="live-merged">
         <thead>
-          <tr><th scope="col">Now</th><th scope="col">A</th><th scope="col">B</th></tr>
+          <tr><th scope="col">{trText("Now")}</th><th scope="col">{trText("A")}</th><th scope="col">{trText("B")}</th></tr>
         </thead>
         <tbody>
-          {SEAT_ORDER.map((s) => (
+          {localise(SEAT_ORDER.map((s) => (
             <tr key={`s${s}`}>
-              <th scope="row"><span class="sw" style={{ background: `var(--seat-${s})` }} /> {SEAT_LABELS[s]}</th>
-              <td class="num">{A.seatsByState[s]}</td>
-              <td class="num">{B.seatsByState[s]}</td>
+              <th scope="row"><span class="sw" style={{ background: `var(--seat-${s})` }} /> {localise(SEAT_LABELS[s])}</th>
+              <td class="num">{localise(A.seatsByState[s])}</td>
+              <td class="num">{localise(B.seatsByState[s])}</td>
             </tr>
-          ))}
-          {COUNTERS.map((c, i) => (
+          )))}
+          {localise(COUNTERS.map((c, i) => (
             <tr key={c.id}>
-              <th scope="row">{c.label}</th>
-              <td class="num">{vA[i]}</td>
-              <td class="num">{vB[i]}</td>
+              <th scope="row">{localise(c.label)}</th>
+              <td class="num">{localise(vA[i])}</td>
+              <td class="num">{localise(vB[i])}</td>
             </tr>
-          ))}
+          )))}
         </tbody>
       </table>
     </section>

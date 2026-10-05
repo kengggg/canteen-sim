@@ -23,7 +23,7 @@ async function dismissHowTo(page: Page) {
 test('the first visit shows the guided story; How this works remains available on demand', async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto('/');
+  await page.goto('/?lang=en');
   const dialog = page.getByRole('dialog', { name: 'How this works' });
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Does saving a table help everyone get lunch?' })).toBeVisible();
@@ -39,7 +39,7 @@ test('the first visit shows the guided story; How this works remains available o
 
 test('loads without console errors; skip to 12:30 then play 120 frames at 120×', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await dismissHowTo(page);
   await expect(page.getByRole('heading', { name: 'Canteen Sim' })).toBeVisible();
   await page.fill('#skip-to', '12:30');
@@ -54,19 +54,19 @@ test('loads without console errors; skip to 12:30 then play 120 frames at 120×'
 });
 
 test('a 2-seed batch completes', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   const r = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.batch(2));
   expect(r.hashes).toHaveLength(10);
 });
 
 test('settings round-trip through the URL and through the settings code', async ({ page, context }) => {
-  await page.goto('/#v=1&m=1&seed=7&crowd.totalPeople=900');
+  await page.goto('/?lang=en#v=1&m=1&seed=7&crowd.totalPeople=900');
   await dismissHowTo(page);
   const cfg = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.config());
   expect(cfg.crowd.totalPeople).toBe(900);
   expect(cfg.seed).toBe(7);
   const p2 = await context.newPage();
-  await p2.goto('/'); // same context: the first-visit panel was already dismissed
+  await p2.goto('/?lang=en'); // same context: the first-visit panel was already dismissed
   await p2.getByRole('button', { name: 'Settings' }).click();
   await p2.fill('#load-code', 'http://x.test/#v=1&m=1&seed=9&crowd.totalPeople=1200');
   await p2.getByRole('button', { name: 'Load', exact: true }).click();
@@ -83,7 +83,7 @@ test('narrow layout (375 px): no horizontal scroll, A stacked above B', async ({
   const ctx = await browser.newContext({ viewport: { width: 375, height: 800 } });
   await ctx.addInitScript(DISMISSED);
   const page = await ctx.newPage();
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await dismissHowTo(page);
   const sw = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(sw).toBe(0);
@@ -92,12 +92,12 @@ test('narrow layout (375 px): no horizontal scroll, A stacked above B', async ({
   await expect(page.locator('.live-merged')).toBeVisible();
 });
 
-test('locales th-TH and de-DE render the clock, counters and first CSV row byte-identically to en-GB', async ({ browser }) => {
+test('browser locales th-TH and de-DE keep numbers and CSV byte-identical to en-GB with the same UI language', async ({ browser }) => {
   const read = async (locale: string) => {
     const ctx = await browser.newContext({ locale });
     await ctx.addInitScript(DISMISSED);
     const page = await ctx.newPage();
-    await page.goto('/');
+    await page.goto('/?lang=en');
     await dismissHowTo(page);
     await page.fill('#skip-to', '12:10');
     await page.getByRole('button', { name: 'Skip to' }).click();

@@ -1,5 +1,4 @@
-/** Every user-facing string (spec §11.6 Labels). */
-
+import { msg as trText } from '../i18n';
 export const APP_TITLE = 'Canteen Sim';
 
 /** Person colour classes in precedence order (CLS ids 0–6). */
@@ -31,7 +30,7 @@ export const SEAT_LABELS = [
   'Saved for a groupmate',
   'Seated',
 ];
-export const seatOpenLabel = (n: number) => `Reserved, open to parties of ≤ ${n}`;
+export const seatOpenLabel = (n: number) => trText("Reserved, open to parties of ≤ {v0}", { v0: (n) });
 
 export const LEGEND_TRAY = 'Carrying a tray';
 export const LEGEND_RING = 'Seats kept for someone not here yet';
@@ -45,7 +44,7 @@ export const OBJECT_NAMES = ['bottle', 'umbrella', 'lanyard'];
 
 export const CANTEEN_A = 'A · Reservation';
 export const CANTEEN_B = 'B · Free flow (no reservations)';
-export const sliderLabel = (p: number) => `Groups that reserve in A: ${p}%`;
+export const sliderLabel = (p: number) => trText("Groups that reserve in A: {v0}%", { v0: (p) });
 
 export const COUNTERS: { id: string; label: string; help: string }[] = [
   { id: 'queuing', label: 'Queuing', help: 'People at a stall from reaching its walkway until they are served, including the person being served.' },
@@ -77,16 +76,16 @@ export const MSG = {
   restore: 'Restore',
   badCode: 'This settings code isn’t valid or is from a newer version',
   badJson: 'This file isn’t a valid Canteen Sim settings file or is from a newer version.',
-  modelNotice: (x: number, y: number) => `Shared with model ${x}; results may differ in model ${y}.`,
+  modelNotice: (x: number, y: number) => trText("Shared with model {v0}; results may differ in model {v1}.", { v0: (x), v1: (y) }),
   storageOff: 'Saving isn’t available in this browser',
-  finished: (clock: string) => `Finished at ${clock}`,
-  truncated: (clock: string) => `Run truncated at ${clock}`,
-  runningAt: (x: number) => `running at ${x}×`,
-  batchFailed: (m: string) => `Batch failed: ${m}`,
-  batchSource: (seed: number) => `Using the settings of the current live lunch (seed ${seed})`,
+  finished: (clock: string) => trText("Finished at {v0}", { v0: (clock) }),
+  truncated: (clock: string) => trText("Run truncated at {v0}", { v0: (clock) }),
+  runningAt: (x: number) => trText("running at {v0}×", { v0: (x) }),
+  batchFailed: (m: string) => trText("Batch failed: {v0}", { v0: (m) }),
+  batchSource: (seed: number) => trText("Using the settings of the current live lunch (seed {v0})", { v0: (seed) }),
   oneLunch: 'This is one lunch.',
-  precomputed: (model: number) => `Precomputed for the default settings, model ${model}. Re-run on this device to check.`,
-  allMatch: (n: number) => `All ${n} runs match`,
+  precomputed: (model: number) => trText("Precomputed for the default settings, model {v0}. Re-run on this device to check.", { v0: (model) }),
+  allMatch: (n: number) => trText("All {v0} runs match", { v0: (n) }),
   copied: 'Copied',
   copyFailed: 'Copy isn’t allowed here. Select the text and copy it yourself.',
   engineError: 'The simulation stopped with an error.',

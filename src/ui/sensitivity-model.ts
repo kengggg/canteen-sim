@@ -1,3 +1,4 @@
+import { msg as trText } from '../i18n';
 import { evidenceDigest } from '../batch/findings-data';
 import type { SensitivityStudy, StudyRow } from '../batch/sensitivity-data';
 import { scenarioConfig, STUDY_FRACTIONS, STUDY_N, STUDY_PLAN, studyPlanKey, studySettingsKey, type StudyScenario } from '../batch/sensitivity-plan';
@@ -28,24 +29,24 @@ export function studyRowForConfig(cfg: Config): StudyRow | null {
 /** A deduplicated scenario can belong to several grids; always name both changed axes in an interaction grid. */
 export function studyCaseLabel(family: string, scenario: StudyScenario): string {
   const c = scenarioConfig(scenario);
-  const room = c.leave.roomNeeded === 0 ? 'ignore seating' : `${c.leave.roomNeeded} ${c.leave.roomNeeded === 1 ? 'table' : 'tables'} must look free`;
-  const suffix = scenario.id === 'default' ? ' (default)' : '';
+  const room = c.leave.roomNeeded === 0 ? trText('ignore seating') : trText("{v0} {v1} must look free", { v0: (c.leave.roomNeeded), v1: (c.leave.roomNeeded === 1 ? 'table' : 'tables') });
+  const suffix = scenario.id === 'default' ? trText(' (default)') : '';
   switch (family) {
     case 'door': return `${room}${suffix}`;
-    case 'crowd': return `${c.crowd.totalPeople} diners${suffix}`;
-    case 'patience': return `${c.leave.waitMean / 60}-minute patience limit${suffix}`;
-    case 'service': return `${c.stalls.serviceMean} seconds per serving${suffix}`;
-    case 'split': return `Split after ${c.search.splitAfter / 60} minutes${suffix}`;
-    case 'sharing': return c.reserve.shareMinEmpty === 6 ? 'Never share a reserved table' : `Share with ${c.reserve.shareMinEmpty} empty seats${suffix}`;
-    case 'visibility': return `See tables within ${c.search.visibility} metres${suffix}`;
-    case 'claimer': return `${c.reserve.claimMode === 'oneClaimer' ? 'One person claims' : 'The whole group claims together'}${suffix}`;
-    case 'parallel': return `${c.search.parallel ? 'All groupmates with food search' : 'One searcher with food'}${suffix}`;
-    case 'claimLimit': return `Claim search limit: ${c.reserve.claimSearchLimit} seconds${suffix}`;
-    case 'rush': return `${Math.round(c.crowd.peakShare * 100)}% of diners in the rush${suffix}`;
-    case 'doorCrowd': return `${c.crowd.totalPeople} diners; ${room}`;
-    case 'doorPatience': return `${c.leave.waitMean / 60}-minute patience; ${room}`;
-    case 'doorService': return `${c.stalls.serviceMean} seconds per serving; ${room}`;
-    case 'splitParallel': return `Split after ${c.search.splitAfter / 60} minutes; ${c.search.parallel ? 'all search' : 'one searcher'}`;
+    case 'crowd': return trText("{v0} diners{v1}", { v0: (c.crowd.totalPeople), v1: (suffix) });
+    case 'patience': return trText("{v0}-minute patience limit{v1}", { v0: (c.leave.waitMean / 60), v1: (suffix) });
+    case 'service': return trText("{v0} seconds per serving{v1}", { v0: (c.stalls.serviceMean), v1: (suffix) });
+    case 'split': return trText("Split after {v0} minutes{v1}", { v0: (c.search.splitAfter / 60), v1: (suffix) });
+    case 'sharing': return c.reserve.shareMinEmpty === 6 ? 'Never share a reserved table' : trText("Share with {v0} empty seats{v1}", { v0: (c.reserve.shareMinEmpty), v1: (suffix) });
+    case 'visibility': return trText("See tables within {v0} metres{v1}", { v0: (c.search.visibility), v1: (suffix) });
+    case 'claimer': return `${c.reserve.claimMode === 'oneClaimer' ? trText('One person claims') : trText('The whole group claims together')}${suffix}`;
+    case 'parallel': return `${c.search.parallel ? trText('All groupmates with food search') : trText('One searcher with food')}${suffix}`;
+    case 'claimLimit': return trText("Claim search limit: {v0} seconds{v1}", { v0: (c.reserve.claimSearchLimit), v1: (suffix) });
+    case 'rush': return trText("{v0}% of diners in the rush{v1}", { v0: (Math.round(c.crowd.peakShare * 100)), v1: (suffix) });
+    case 'doorCrowd': return trText("{v0} diners; {v1}", { v0: (c.crowd.totalPeople), v1: (room) });
+    case 'doorPatience': return trText("{v0}-minute patience; {v1}", { v0: (c.leave.waitMean / 60), v1: (room) });
+    case 'doorService': return trText("{v0} seconds per serving; {v1}", { v0: (c.stalls.serviceMean), v1: (room) });
+    case 'splitParallel': return trText("Split after {v0} minutes; {v1}", { v0: (c.search.splitAfter / 60), v1: (c.search.parallel ? 'all search' : 'one searcher') });
     default: return scenario.label;
   }
 }

@@ -1,3 +1,4 @@
+import { localise, msg as trText } from '../i18n';
 import { useEffect, useRef } from 'preact/hooks';
 import { HOWTO_STEPS, HOWTO_TITLE } from './labels';
 import { controller, drawer, evidenceOpen, howto, playing, speed } from './store';
@@ -15,16 +16,14 @@ export function HowTo() {
   return (
     <div class="overlay" role="dialog" aria-modal="true" aria-labelledby="howto-title">
       <div class="howto">
-        <h2 id="howto-title">{HOWTO_TITLE}</h2>
+        <h2 id="howto-title">{localise(HOWTO_TITLE)}</h2>
         <ol>
-          {HOWTO_STEPS.map((s) => <li key={s}>{s}</li>)}
+          {localise(HOWTO_STEPS.map((s) => <li key={s}>{localise(s)}</li>))}
         </ol>
         <div class="howto-actions">
-          <button type="button" class="primary" ref={start} onClick={() => { dismiss(); speed.value = 60; controller.speed = 60; controller.playing = true; playing.value = true; }}>
-            Start lunch
-          </button>
-          <button type="button" onClick={() => { dismiss(); evidenceOpen.value = true; drawer.value = 'batch'; }}>Show evidence</button>
-          <button type="button" class="linklike" onClick={dismiss}>Close</button>
+          <button type="button" class="primary" ref={start} onClick={() => { dismiss(); speed.value = 60; controller.speed = 60; controller.playing = true; playing.value = true; }}>{trText("Start lunch")}</button>
+          <button type="button" onClick={() => { dismiss(); evidenceOpen.value = true; drawer.value = 'batch'; }}>{trText("Show evidence")}</button>
+          <button type="button" class="linklike" onClick={dismiss}>{trText("Close")}</button>
         </div>
       </div>
     </div>

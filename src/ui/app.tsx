@@ -1,3 +1,5 @@
+import { noticeText } from './notice-text';
+import { language, localise, msg as trText, rich } from '../i18n';
 import { useEffect, useState } from 'preact/hooks';
 import { MODEL_VERSION } from '../sim/version';
 import { MSG } from './labels';
@@ -12,6 +14,7 @@ import { EndCard } from './endcard';
 import { HowTo } from './howto';
 import { HoverCard } from './hovercard';
 import { Story } from './story';
+import { LanguagePicker } from './language';
 
 const HOST_THEME = document.documentElement.getAttribute('data-theme');
 
@@ -20,9 +23,9 @@ function ErrorBanner({ err }: { err: NonNullable<typeof controller.error> }) {
   const details = `Canteen Sim error: ${err.message}\nsim ms: ${err.atMs}\nseed: ${err.seed}\nsettings code: ${err.code}`;
   return (
     <div class="banner error" role="alert">
-      <span>{MSG.engineError} {err.message} (at {Math.round(err.atMs / 1000)} s, seed {err.seed}, settings code <code>{err.code}</code>)</span>
-      <button type="button" onClick={async () => { if (!(await copyText(details))) setFallback(details); }}>Copy details</button>
-      {fallback && <textarea class="copybox" readOnly value={fallback} onFocus={(e) => (e.target as HTMLTextAreaElement).select()} />}
+      <span>{rich("{v0} {v1} (at {v2} s, seed {v3}, settings code {v4})", { v0: (MSG.engineError), v1: (err.message), v2: (Math.round(err.atMs / 1000)), v3: (err.seed), v4: (<code>{err.code}</code>) })}</span>
+      <button type="button" onClick={async () => { if (!(await copyText(details))) setFallback(details); }}>{trText("Copy details")}</button>
+      {localise(fallback && <textarea class="copybox" readOnly value={fallback} onFocus={(e) => (e.target as HTMLTextAreaElement).select()} />)}
     </div>
   );
 }
@@ -32,24 +35,28 @@ function Banners() {
   const err = controller.error;
   return (
     <div class="banners" aria-live="polite">
-      {dirty.value && (
+      {localise(dirty.value && (
         <div class="banner warn">
-          <span>{MSG.dirty}</span>
-          <button type="button" class="primary" onClick={restart}>Restart</button>
-        </div>
-      )}
-      {err && <ErrorBanner err={err} />}
-      {notices.value.map((n, i) => (
-        <div class="banner info" key={i}>
-          <span>{n}</span>
-          <button type="button" aria-label="Dismiss" onClick={() => (notices.value = notices.value.filter((_, j) => j !== i))}>×</button>
+          <span>{localise(MSG.dirty)}</span>
+          <button type="button" class="primary" onClick={restart}>{trText("Restart")}</button>
         </div>
       ))}
+      {localise(err && <ErrorBanner err={err} />)}
+      {localise(notices.value.map((n, i) => (
+        <div class="banner info" key={i}>
+          <span>{noticeText(typeof n === 'function' ? n() : n)}</span>
+          <button type="button" aria-label={trText("Dismiss")} onClick={() => (notices.value = notices.value.filter((_, j) => j !== i))}>×</button>
+        </div>
+      )))}
     </div>
   );
 }
 
 export function App() {
+  useEffect(() => {
+    document.documentElement.lang = language.value;
+    document.title = language.value === 'th' ? 'Canteen Sim · แบบจำลองโรงอาหาร' : 'Canteen Sim';
+  }, [language.value]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented) return;
@@ -123,6 +130,7 @@ export function App() {
   return (
     <>
       <main>
+        <div class="language-bar"><LanguagePicker /></div>
         <div class="story-wrap"><Story /></div>
         <TopBar />
         <Banners />
@@ -136,9 +144,7 @@ export function App() {
       <EndCard />
       <HowTo />
       <HoverCard />
-      <footer class="about muted">
-        Canteen Sim · model {MODEL_VERSION} · build {__BUILD_SHA__}
-      </footer>
+      <footer class="about muted">{rich("Canteen Sim · model {v0} · build {v1}", { v0: (MODEL_VERSION), v1: (__BUILD_SHA__) })}</footer>
     </>
   );
 }

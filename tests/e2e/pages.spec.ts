@@ -27,18 +27,18 @@ test('served as a GitHub Pages project site, the page runs with no other request
   page.on('request', (r) => requests.push(r.url()));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(SITE);
+  await page.goto(`${SITE}?lang=en`);
   await expect(page.getByRole('heading', { name: 'Canteen Sim' })).toBeVisible();
   await page.locator('#skip-to').fill('12:00');
   await page.getByRole('button', { name: 'Skip to' }).click();
   await expect(page.locator('.clock')).toHaveText('12:00', { timeout: 60_000 });
-  expect(requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'))).toEqual([SITE]);
+  expect(requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'))).toEqual([`${SITE}?lang=en`]);
   expect(errors).toEqual([]);
 });
 
 test('batches use real workers on Pages, and a shared #v= link loads its settings', async ({ page, context }) => {
   await pages(context);
-  await page.goto(`${SITE}#v=1&m=1&seed=7&crowd.totalPeople=900`);
+  await page.goto(`${SITE}?lang=en#v=1&m=1&seed=7&crowd.totalPeople=900`);
   const cfg = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.config());
   expect([cfg.seed, cfg.crowd.totalPeople]).toEqual([7, 900]);
   const r = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.batch(2));
@@ -48,7 +48,7 @@ test('batches use real workers on Pages, and a shared #v= link loads its setting
 
 test('Download CSV and Download JSON save real files on Pages', async ({ page, context }) => {
   await pages(context);
-  await page.goto(SITE);
+  await page.goto(`${SITE}?lang=en`);
   await page.getByRole('button', { name: 'Settings' }).click();
   const json = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download JSON' }).click();
@@ -85,9 +85,9 @@ test('served from the root of a custom domain (Cloudflare Pages), the page runs 
   page.on('request', (r) => requests.push(r.url()));
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   page.on('pageerror', (e) => errors.push(String(e)));
-  await page.goto(`${ROOT}#findings`);
+  await page.goto(`${ROOT}?lang=en#findings`);
   await expect(page.getByRole('complementary', { name: 'Findings' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'How this works' })).toHaveCount(0);
-  expect(requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'))).toEqual([ROOT]);
+  expect(requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'))).toEqual([`${ROOT}?lang=en`]);
   expect(errors).toEqual([]);
 });

@@ -1,3 +1,4 @@
+import { localise, msg as trText } from '../i18n';
 import { useEffect } from 'preact/hooks';
 import { pairMetrics } from '../sim/engine';
 import { defaultConfig } from '../config/schema';
@@ -23,31 +24,29 @@ export function EndCard() {
   ];
   const isDefault = JSON.stringify({ ...applied.value, seed: 1 }) === JSON.stringify(defaultConfig());
   return (
-    <aside class="endcard" role="dialog" aria-label="End of lunch">
+    <aside class="endcard" role="dialog" aria-label={trText("End of lunch")}>
       <header>
-        <h2>Lunch finished</h2>
-        <button type="button" aria-label="Close" onClick={() => (endCardOpen.value = false)}>×</button>
+        <h2>{trText("Lunch finished")}</h2>
+        <button type="button" aria-label={trText("Close")} onClick={() => (endCardOpen.value = false)}>×</button>
       </header>
       <table class="data">
-        <thead><tr><th scope="col">Primary endpoint</th><th scope="col">A</th><th scope="col">B</th><th scope="col">Free-flow advantage</th></tr></thead>
+        <thead><tr><th scope="col">{trText("Primary endpoint")}</th><th scope="col">{trText("A")}</th><th scope="col">{trText("B")}</th><th scope="col">{trText("Free-flow advantage")}</th></tr></thead>
         <tbody>
-          {rows.map(([label, va, vb, better, unit, d]) => {
+          {localise(rows.map(([label, va, vb, better, unit, d]) => {
             const adv = va === null || vb === null ? null : better === 'lower' ? va - vb : vb - va;
             return (
               <tr key={label}>
-                <th scope="row">{label}</th>
-                <td class="num">{num(va, d)}</td>
-                <td class="num">{num(vb, d)}</td>
-                <td class="num">{adv === null ? '—' : `${adv > 0 ? '+' : ''}${num(adv, d)} ${unit}`}</td>
+                <th scope="row">{localise(label)}</th>
+                <td class="num">{localise(num(va, d))}</td>
+                <td class="num">{localise(num(vb, d))}</td>
+                <td class="num">{localise(adv === null ? '—' : `${adv > 0 ? '+' : ''}${num(adv, d)} ${trText(unit)}`)}</td>
               </tr>
             );
-          })}
+          }))}
         </tbody>
       </table>
-      <p class="muted">{MSG.oneLunch}</p>
-      <button type="button" class="primary" onClick={() => { endCardOpen.value = false; evidenceOpen.value = isDefault; drawer.value = 'batch'; }}>
-        See 30 lunches
-      </button>
+      <p class="muted">{localise(MSG.oneLunch)}</p>
+      <button type="button" class="primary" onClick={() => { endCardOpen.value = false; evidenceOpen.value = isDefault; drawer.value = 'batch'; }}>{trText("See 30 lunches")}</button>
     </aside>
   );
 }

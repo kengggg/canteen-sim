@@ -1,3 +1,4 @@
+import { localise } from '../i18n';
 import { useState } from 'preact/hooks';
 import { sliderLabel } from './labels';
 import { applied, batchRunning, releaseSlider, tick } from './store';
@@ -17,7 +18,7 @@ export function ASlider() {
   };
   return (
     <label class="aslider" for="slider-a">
-      <span class="aslider-label">{sliderLabel(p)}</span>
+      <span class="aslider-label">{localise(sliderLabel(p))}</span>
       <input
         id="slider-a"
         type="range"

@@ -1,3 +1,4 @@
+import { localise, rich } from '../i18n';
 import { CLASS_LABELS, COLLECTING_LABEL, LEFT_LABELS, OBJECT_NAMES, SEAT_LABELS, SPLITTING_LABEL, seatOpenLabel } from './labels';
 import { applied, controller, hover, tick } from './store';
 
@@ -16,10 +17,10 @@ export function HoverCard() {
     const mins = Math.max(0, Math.floor((e.nowMs - v.since[p]) / 60_000));
     return (
       <div class="hovercard" style={style} role="status">
-        <b>{h.side === 0 ? 'A' : 'B'} · group {s.groupId[s.personGroup[p]]}</b>
-        <span>Group of {s.groupSize[p]}{h.side === 0 && s.isReserver[p] ? (v.isClaimer[p] ? ' · claimer' : ' · reserver') : ''}</span>
-        <span>{CLASS_LABELS[v.cls[p]]}, {mins} min</span>
-        {v.collecting[p] === 1 ? <span>{COLLECTING_LABEL}</span> : v.leftKind[p] !== 0 ? <span>{LEFT_LABELS[v.leftKind[p]]}</span> : v.splitting[p] === 1 && v.cls[p] === 2 ? <span>{SPLITTING_LABEL}</span> : null}
+        <b>{rich("{v0} · group {v1}", { v0: (h.side === 0 ? 'A' : 'B'), v1: (s.groupId[s.personGroup[p]]) })}</b>
+        <span>{rich("Group of {v0}{v1}", { v0: (s.groupSize[p]), v1: (h.side === 0 && s.isReserver[p] ? (v.isClaimer[p] ? ' · claimer' : ' · reserver') : '') })}</span>
+        <span>{rich("{v0}, {v1} min", { v0: (CLASS_LABELS[v.cls[p]]), v1: (mins) })}</span>
+        {localise(v.collecting[p] === 1 ? <span>{localise(COLLECTING_LABEL)}</span> : v.leftKind[p] !== 0 ? <span>{localise(LEFT_LABELS[v.leftKind[p]])}</span> : v.splitting[p] === 1 && v.cls[p] === 2 ? <span>{localise(SPLITTING_LABEL)}</span> : null)}
       </div>
     );
   }
@@ -30,12 +31,12 @@ export function HoverCard() {
   const claimed = v.tableClaimed[t] === 1;
   return (
     <div class="hovercard" style={style} role="status">
-      <b>{h.side === 0 ? 'A' : 'B'} · table {t + 1}</b>
-      {claimed && <span>Reserved with a {OBJECT_NAMES[v.tableObject[t]]} for {Math.floor((e.nowMs - v.tableClaimSince[t]) / 60_000)} min</span>}
+      <b>{rich("{v0} · table {v1}", { v0: (h.side === 0 ? 'A' : 'B'), v1: (t + 1) })}</b>
+      {localise(claimed && <span>{rich("Reserved with a {v0} for {v1} min", { v0: (OBJECT_NAMES[v.tableObject[t]]), v1: (Math.floor((e.nowMs - v.tableClaimSince[t]) / 60_000)) })}</span>)}
       <ul class="hovercard-seats">
-        {states.map((st, j) => (
-          <li key={j}><span class="sw" style={{ background: `var(--seat-${st})` }} /> {st === 1 ? seatOpenLabel(Math.min(applied.value.reserve.shareMaxParty, free)) : SEAT_LABELS[st]}</li>
-        ))}
+        {localise(states.map((st, j) => (
+          <li key={j}><span class="sw" style={{ background: `var(--seat-${st})` }} /> {localise(st === 1 ? seatOpenLabel(Math.min(applied.value.reserve.shareMaxParty, free)) : SEAT_LABELS[st])}</li>
+        )))}
       </ul>
     </div>
   );

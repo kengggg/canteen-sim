@@ -16,7 +16,7 @@ const SECTIONS = ['In short', 'How the comparison works', '1. Reservation loses 
 
 test('Findings opens from the top bar with every section, its tables and six charts', async ({ page }) => {
   const errors = watchErrors(page);
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.getByRole('button', { name: 'Findings', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Findings' });
   await expect(panel).toBeVisible();
@@ -29,7 +29,7 @@ test('Findings opens from the top bar with every section, its tables and six cha
 });
 
 test('a chart switches to its table and back', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/?lang=en');
   await page.getByRole('button', { name: 'Findings', exact: true }).click();
   const fig = page.locator('.fchart').first();
   await fig.getByRole('button', { name: 'Show table' }).click();
@@ -40,7 +40,7 @@ test('a chart switches to its table and back', async ({ page }) => {
 });
 
 test('#findings opens the panel on load, and the evidence panel links to it', async ({ page }) => {
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   await expect(page.getByRole('complementary', { name: 'Findings' })).toBeVisible();
   await page.getByRole('button', { name: 'Batch runs' }).click();
   await page.getByRole('button', { name: 'Read the findings' }).click();
@@ -48,7 +48,7 @@ test('#findings opens the panel on load, and the evidence panel links to it', as
 });
 
 test('with other settings applied the panel says it describes the defaults', async ({ page }) => {
-  await page.goto('/#v=1&m=1&seed=7&crowd.totalPeople=900');
+  await page.goto('/?lang=en#v=1&m=1&seed=7&crowd.totalPeople=900');
   await page.getByRole('button', { name: 'Findings', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Findings' });
   await expect(panel.getByText('Your current settings differ from the defaults')).toBeVisible();
@@ -58,7 +58,7 @@ test('with other settings applied the panel says it describes the defaults', asy
 
 test('at phone width the panel fits without sideways scrolling', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const body = page.locator('.drawer-findings .drawer-body');
   await expect(body).toBeVisible();
   const overflow = await body.evaluate((el) => el.scrollWidth - el.clientWidth);
@@ -68,7 +68,7 @@ test('at phone width the panel fits without sideways scrolling', async ({ page }
 });
 
 test('the rendered prose and tables carry the evidence and findings figures', async ({ page }) => {
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const panel = page.getByRole('complementary', { name: 'Findings' });
   const text = await panel.innerText();
   for (const s of [
@@ -101,7 +101,7 @@ test('the rendered prose and tables carry the evidence and findings figures', as
 });
 
 test('the slider or a new seed alone do not flag the findings as not applying', async ({ page }) => {
-  await page.goto('/#v=1&m=1&reserve.percentA=1');
+  await page.goto('/?lang=en#v=1&m=1&reserve.percentA=1');
   await page.getByRole('button', { name: 'Findings', exact: true }).click();
   const panel = page.getByRole('complementary', { name: 'Findings' });
   await expect(panel.locator('.flead')).toBeVisible();
@@ -109,7 +109,7 @@ test('the slider or a new seed alone do not flag the findings as not applying', 
   await expect(panel.getByText('The lunch the app plays on screen')).toBeVisible();
   // A hash-only change does not reload the page, and settings codes apply on load.
   await page.goto('about:blank');
-  await page.goto('/#v=1&m=1&seed=7');
+  await page.goto('/?lang=en#v=1&m=1&seed=7');
   await page.getByRole('button', { name: 'Findings', exact: true }).click();
   await expect(panel.getByText('Your current settings differ')).toHaveCount(0);
   await expect(panel.getByText('Lunch 1 of the evidence')).toBeVisible();
@@ -119,7 +119,7 @@ test('the slider or a new seed alone do not flag the findings as not applying', 
 test('a first visit to #findings shows the panel without the how-to dialog, and closing it clears the hash', async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   await expect(page.getByRole('complementary', { name: 'Findings' })).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'How this works' })).toHaveCount(0);
   await page.getByRole('complementary', { name: 'Findings' }).getByRole('button', { name: 'Close' }).click();
@@ -128,7 +128,7 @@ test('a first visit to #findings shows the panel without the how-to dialog, and 
 });
 
 test('jumping from Findings to Assumptions opens it at the top with focus on its heading', async ({ page }) => {
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const body = page.locator('.drawer-findings .drawer-body');
   await body.evaluate((el) => { el.scrollTop = el.scrollHeight; });
   await page.getByRole('button', { name: 'See all assumptions' }).click();
@@ -139,7 +139,7 @@ test('jumping from Findings to Assumptions opens it at the top with focus on its
 
 test('at 320 px the group-size labels do not overlap', async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 640 });
-  await page.goto('/#findings');
+  await page.goto('/?lang=en#findings');
   const boxes = await page.locator('.fchart').nth(4).locator('.flabel').evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.left, r.right]));
   expect(boxes).toHaveLength(6);
   for (let i = 1; i < boxes.length; i++) expect(boxes[i][0]).toBeGreaterThanOrEqual(boxes[i - 1][1]);

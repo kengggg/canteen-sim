@@ -43,6 +43,33 @@ than that. Design and the frozen rules: [`docs/superpowers/specs/2026-09-26-mode
   The app can copy or download the protocol and complete report.
 - **Implementation plans:** [`docs/superpowers/plans/`](docs/superpowers/plans/)
 
+## Thai and English
+
+The visible **ภาษา / Language** selector changes the interface, explanations, accessibility labels, charts,
+3D signs and research-document downloads without restarting the lunch. A valid `?lang=th` or `?lang=en` link
+wins over the saved choice; without either, Thai is the default regardless of the browser's language.
+The choice still works for the current page when storage is blocked.
+
+Numbers use the same Latin digits, decimal point and 24-hour clock in both languages. Model rules, seeds,
+settings codes, JSON and CSV identifiers and values are unchanged. Research conclusions retain their signs,
+units, uncertainty and simulation-only limits. The reader documents are available in both languages:
+[Thai protocol](docs/research-protocol.th.md) and [Thai complete results](docs/studies/visibility-roles-v1.th.md).
+Source links and technical reproduction commands remain in their original form.
+
+For UI edits, add a complete English message and its Thai translation to `src/i18n/th.json`. Use `msg` for
+text and `rich` for messages containing real links or controls; keep placeholders identical, with ordering
+free to suit Thai. Render metadata through the translation helpers without translating model identifiers
+or user-entered names. `npm run localise` generates the compact runtime catalogue, checks key collisions
+and placeholders, and rebuilds Thai documents from `docs/translations/research-th.json` while preserving
+numbers, code and links. It runs automatically before development and production builds.
+
+`npm run localise -- --check` checks freshness without writing. Unit tests check message coverage and document
+parity; `tests/e2e/localisation.spec.ts` covers language precedence, state preservation, equivalent numerical
+exports, downloads, blocked storage/copying, keyboard use, narrow screens and the offline single-file app.
+Thai uses **Noto Sans Thai Looped**, embedded in the single-file app; no external font or translation fetch
+is required. Its Thai regular face is bundled, with browser-generated bold weights to keep the app within
+the 1.5 MiB budget. Font provenance and the SIL Open Font License are in [`src/assets/fonts/`](src/assets/fonts/).
+
 ## Run, test, build
 
 Requires Node 22.
@@ -61,6 +88,7 @@ npm run sensitivity -- --check  # fresh full rerun; fail if any published study 
 npm run research       # separate role experiment: 600 runs, exact audit, all contrasts and report
 npm run research -- --check     # fresh reproduction of the role experiment
 npm run golden:update  # Node reference hashes for the cross-browser self-test
+npm run localise       # rebuild Thai catalogue and reader documents (also runs before dev/build)
 npm run build          # dist/index.html — one self-contained file
 npm run build:pages    # the same, checked self-contained (≤ 1.5 MB), plus dist/.nojekyll: what Pages deploys
 npx playwright install chromium firefox webkit   # once
@@ -93,10 +121,15 @@ are derived from the live seed (spec §10.1).
 The whole sim is one plain HTML file: code, styles, the batch worker and the precomputed evidence are all inside
 `dist/index.html`, and it makes no network requests. Any static host works, and so does opening the file from disk.
 
+Social previews use [`public/og/canteen-sim-manga-v1.jpg`](public/og/canteen-sim-manga-v1.jpg), a 1200 × 630 manga
+cover copied to `dist/og/` during builds. The page's Open Graph and large-image card metadata points to the production
+domain. Publish that image alongside the HTML for link previews; the offline simulator itself does not load it.
+The original artwork, generation prompt and export details are recorded in [`docs/og-image.md`](docs/og-image.md).
+
 The site is https://canteen.lab.patipat.org, deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
 on every push to `main` after lint, type checks, unit/sanity tests, browser regressions and the single-file build pass.
 [`ci.yml`](.github/workflows/ci.yml) runs the same checks on every pull request. Chromium covers the complete browser
-suite; Firefox and WebKit cover determinism, the guided opening, sensitivity and research flows. On macOS builds
+suite; Firefox and WebKit cover determinism, the guided opening, sensitivity, research and localisation flows. On macOS builds
 where Playwright Firefox reports “Could not find profile folder”, `CANTEEN_E2E_FIREFOX=0` skips it explicitly; this
 does not verify Firefox. CI on Linux keeps Firefox enabled.
 
@@ -144,4 +177,5 @@ share settings with the settings code. Batch runs fall back to time-sliced main-
 | `src/research` | Separately versioned experiment plans, paired contrasts, diagnostics and execution |
 | `src/render` | three.js scenes (two scissored viewports), instanced people, overlays, cameras, picking |
 | `src/ui` | Preact panels, playback controller, charts |
+| `src/i18n` | Language preference, complete-message translation, compact Thai catalogue and document generation |
 | `tests` | Vitest unit/rule tests, `tests/sanity` (model sanity), `tests/e2e` (Playwright), golden files |

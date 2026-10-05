@@ -1,3 +1,5 @@
+import { noticeText } from './notice-text';
+import { localise, msg as trText, rich } from '../i18n';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { clampConfig } from '../config/clamp';
 import { exportJson, importJson, applyValues } from '../config/load';
@@ -35,9 +37,9 @@ export function LoadReadout({ cfg }: { cfg: Config }) {
   const r = loadReadout(cfg);
   return (
     <dl class="readout">
-      <div><dt>Peak-hour arrivals</dt><dd class="num">{num(r.arrivals, 1)}/min</dd></div>
-      <div><dt>Stall capacity</dt><dd class="num">{num(r.stalls, 1)}/min</dd></div>
-      <div title="Upper bound: ignores waiting for the slowest groupmate, holds and table fragmentation"><dt>Seat turnover (upper bound)</dt><dd class="num">{num(r.seats, 1)}/min</dd></div>
+      <div><dt>{trText("Peak-hour arrivals")}</dt><dd class="num">{rich("{v0}/min", { v0: (num(r.arrivals, 1)) })}</dd></div>
+      <div><dt>{trText("Stall capacity")}</dt><dd class="num">{rich("{v0}/min", { v0: (num(r.stalls, 1)) })}</dd></div>
+      <div title={trText("Upper bound: ignores waiting for the slowest groupmate, holds and table fragmentation")}><dt>{trText("Seat turnover (upper bound)")}</dt><dd class="num">{rich("{v0}/min", { v0: (num(r.seats, 1)) })}</dd></div>
     </dl>
   );
 }
@@ -51,7 +53,7 @@ function Control({ m }: { m: SettingMeta }) {
   if (m.type === 'enum') {
     return (
       <select id={id} value={v as string} onChange={(e) => set((e.target as HTMLSelectElement).value)}>
-        {m.options!.map((o) => <option key={o} value={o}>{o === 'oneClaimer' ? 'One member reserves' : 'The whole group reserves together'}</option>)}
+        {localise(m.options!.map((o) => <option key={o} value={o}>{localise(o === 'oneClaimer' ? 'One member reserves' : 'The whole group reserves together')}</option>))}
       </select>
     );
   }
@@ -64,13 +66,13 @@ function Control({ m }: { m: SettingMeta }) {
     const mean = total > 0 ? mix.reduce((a, w, i) => a + w * (i + 1), 0) / total : 0;
     return (
       <div class="mix" id={id}>
-        {mix.map((w, i) => (
+        {localise(mix.map((w, i) => (
           <label key={i} for={`${id}-${i}`}>
-            <span class="muted">{i + 1}</span>
+            <span class="muted">{localise(i + 1)}</span>
             <input id={`${id}-${i}`} type="number" min={0} max={100} step={1} value={w} onChange={(e) => { const nx = [...mix]; nx[i] = Number((e.target as HTMLInputElement).value); set(nx); }} />
           </label>
-        ))}
-        <span class="muted num">mean size {num(mean, 2)}</span>
+        )))}
+        <span class="muted num">{rich("mean size {v0}", { v0: (num(mean, 2)) })}</span>
       </div>
     );
   }
@@ -87,8 +89,8 @@ function Control({ m }: { m: SettingMeta }) {
         value={Math.round((v as number) * f * 1e6) / 1e6}
         onChange={(e) => set(Number((e.target as HTMLInputElement).value) / f)}
       />
-      <span class="muted">{m.uiUnit}</span>
-      {m.id === 'seed' && <button type="button" onClick={() => set(Math.floor(Math.random() * 4294967296))}>New seed</button>}
+      <span class="muted">{localise(m.uiUnit)}</span>
+      {localise(m.id === 'seed' && <button type="button" onClick={() => set(Math.floor(Math.random() * 4294967296))}>{trText("New seed")}</button>)}
     </span>
   );
 }
@@ -120,30 +122,29 @@ function Sharing() {
     pending.value = r.cfg;
     setErr(null);
     for (const n of r.notices) note(n);
-    if (r.modelNotice) note(MSG.modelNotice(r.modelNotice.from, r.modelNotice.to));
+    if (r.modelNotice) note(() => MSG.modelNotice(r.modelNotice!.from, r.modelNotice!.to));
   };
   const download = async (name: string, text: string, type: string) => {
     const m = await saveText(name, text, type);
     if (m) setMsg(m);
   };
   return (
-    <section class="share" aria-label="Share and save">
-      <h3 class="eyebrow">Share and save</h3>
+    <section class="share" aria-label={trText("Share and save")}>
+      <h3 class="eyebrow">{trText("Share and save")}</h3>
       <div class="row">
-        <button type="button" onClick={() => copy(settingsCode(pending.value))}>Copy settings code</button>
-        {!inViewer && <button type="button" onClick={() => copy(location.href.split('#')[0] + encodeHash(pending.value))}>Copy link</button>}
+        <button type="button" onClick={() => copy(settingsCode(pending.value))}>{trText("Copy settings code")}</button>
+        {localise(!inViewer && <button type="button" onClick={() => copy(location.href.split('#')[0] + encodeHash(pending.value))}>{trText("Copy link")}</button>)}
       </div>
       <div class="row">
-        <label for="load-code" class="sr-only">Settings code or link</label>
-        <input id="load-code" placeholder="Paste a settings code or link" value={code} onInput={(e) => setCode((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); load(); } }} />
-        <button type="button" onClick={load}>Load</button>
+        <label for="load-code" class="sr-only">{trText("Settings code or link")}</label>
+        <input id="load-code" placeholder={trText("Paste a settings code or link")} value={code} onInput={(e) => setCode((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); load(); } }} />
+        <button type="button" onClick={load}>{trText("Load")}</button>
       </div>
-      {err && <p class="error-text" role="alert">{err}</p>}
+      {localise(err && <p class="error-text" role="alert">{localise(err)}</p>)}
       <div class="row">
-        {canDownload.value && <button type="button" onClick={() => download('canteen-sim-settings.json', exportJson(pending.value), 'application/json')}>Download JSON</button>}
-        <button type="button" onClick={() => copy(exportJson(pending.value))}>Copy JSON</button>
-        <label class="filebtn" for="import-json">Import JSON
-          <input id="import-json" type="file" accept="application/json,.json" onChange={async (e) => {
+        {localise(canDownload.value && <button type="button" onClick={() => download('canteen-sim-settings.json', exportJson(pending.value), 'application/json')}>{trText("Download JSON")}</button>)}
+        <button type="button" onClick={() => copy(exportJson(pending.value))}>{trText("Copy JSON")}</button>
+        <label class="filebtn" for="import-json">{rich("Import JSON{v0}", { v0: (<input id="import-json" type="file" accept="application/json,.json" onChange={async (e) => {
             const f = (e.target as HTMLInputElement).files?.[0];
             if (!f) return;
             const r = importJson(await f.text());
@@ -151,33 +152,32 @@ function Sharing() {
             setErr(null);
             pending.value = r.cfg;
             for (const n of r.notices) note(n);
-            if (r.modelNotice) note(MSG.modelNotice(r.modelNotice.from, r.modelNotice.to));
-          }} />
-        </label>
+            if (r.modelNotice) note(() => MSG.modelNotice(r.modelNotice!.from, r.modelNotice!.to));
+          }} />) })}</label>
       </div>
-      {msg && <p class="muted" role="status">{msg}</p>}
-      {shown && <textarea class="copybox" readOnly value={shown} onFocus={(e) => (e.target as HTMLTextAreaElement).select()} />}
-      <h3 class="eyebrow">Saved scenarios</h3>
-      {storageOk ? (
+      {localise(msg && <p class="muted" role="status">{localise(msg)}</p>)}
+      {localise(shown && <textarea class="copybox" readOnly value={shown} onFocus={(e) => (e.target as HTMLTextAreaElement).select()} />)}
+      <h3 class="eyebrow">{trText("Saved scenarios")}</h3>
+      {localise(storageOk ? (
         <>
           <div class="row">
-            <label for="scenario-name" class="sr-only">Scenario name</label>
-            <input id="scenario-name" placeholder="Name this scenario" value={scenarioName} onInput={(e) => setScenarioName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveScenario(); } }} />
-            <button type="button" onClick={saveScenario}>Save</button>
+            <label for="scenario-name" class="sr-only">{trText("Scenario name")}</label>
+            <input id="scenario-name" placeholder={trText("Name this scenario")} value={scenarioName} onInput={(e) => setScenarioName((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveScenario(); } }} />
+            <button type="button" onClick={saveScenario}>{trText("Save")}</button>
           </div>
           <ul class="scenarios">
-            {Object.entries(saved).map(([name, c]) => (
+            {localise(Object.entries(saved).map(([name, c]) => (
               <li key={name}>
                 <span>{name}</span>
-                <button type="button" onClick={() => { const d = parseShared(c); if (d.ok) pending.value = applyValues(d.values, d.model).cfg; }}>Load</button>
-                <button type="button" onClick={() => { const n = { ...saved }; delete n[name]; storage.set('canteen-sim:scenarios', JSON.stringify(n)); bump(); }}>Delete</button>
+                <button type="button" onClick={() => { const d = parseShared(c); if (d.ok) pending.value = applyValues(d.values, d.model).cfg; }}>{trText("Load")}</button>
+                <button type="button" onClick={() => { const n = { ...saved }; delete n[name]; storage.set('canteen-sim:scenarios', JSON.stringify(n)); bump(); }}>{trText("Delete")}</button>
               </li>
-            ))}
+            )))}
           </ul>
         </>
       ) : (
-        <p class="muted">{MSG.storageOff}</p>
-      )}
+        <p class="muted">{localise(MSG.storageOff)}</p>
+      ))}
     </section>
   );
 }
@@ -204,31 +204,31 @@ export function SettingsPanel() {
   return (
     <div class="settings" ref={ref}>
       <LoadReadout cfg={pending.value} />
-      {v.blocking.length > 0 && (
+      {localise(v.blocking.length > 0 && (
         <div class="blocking" role="alert">
-          {v.blocking.map((b) => (
+          {localise(v.blocking.map((b) => (
             <p key={b.code}>
-              {b.message}{' '}
-              {b.code === 'groupTooBig' && <button type="button" onClick={fixMix}>Move those shares onto the largest size that fits</button>}
+              {noticeText(b.message)}{localise(' ')}
+              {localise(b.code === 'groupTooBig' && <button type="button" onClick={fixMix}>{trText("Move those shares onto the largest size that fits")}</button>)}
             </p>
-          ))}
+          )))}
         </div>
-      )}
-      {GROUPS.map((g) => (
-        <fieldset key={g} class="setgroup">
-          <legend>{g}</legend>
-          {META.filter((m) => m.group === g).map((m) => (
-            <div class={`setting ${focusSetting.value === m.id ? 'focus' : ''}`} key={m.id} data-setting={m.id}>
-              <label for={`set-${m.id.replace('.', '-')}`} class="setting-label">{m.label}</label>
-              <Control m={m} />
-              <p class="setting-help muted">{m.help}</p>
-              {(byId.get(m.id) ?? []).map((x) => <p key={x.code} class={x.kind === 'block' ? 'error-text' : 'warn-text'}>{x.message}</p>)}
-            </div>
-          ))}
-        </fieldset>
       ))}
+      {localise(GROUPS.map((g) => (
+        <fieldset key={g} class="setgroup">
+          <legend>{localise(g)}</legend>
+          {localise(META.filter((m) => m.group === g).map((m) => (
+            <div class={`setting ${focusSetting.value === m.id ? 'focus' : ''}`} key={m.id} data-setting={m.id}>
+              <label for={`set-${m.id.replace('.', '-')}`} class="setting-label">{localise(m.label)}</label>
+              <Control m={m} />
+              <p class="setting-help muted">{localise(m.help)}</p>
+              {localise((byId.get(m.id) ?? []).map((x) => <p key={x.code} class={x.kind === 'block' ? 'error-text' : 'warn-text'}>{noticeText(x.message)}</p>))}
+            </div>
+          )))}
+        </fieldset>
+      )))}
       <Sharing />
-      {dirty.value && <button type="button" class="primary sticky-apply" onClick={restart} disabled={v.blocking.length > 0}>Restart to apply</button>}
+      {localise(dirty.value && <button type="button" class="primary sticky-apply" onClick={restart} disabled={v.blocking.length > 0}>{trText("Restart to apply")}</button>)}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { localise, msg as trText } from '../i18n';
 import { AssumptionsPanel } from './assumptions';
 import { FindingsPanel } from './findings';
 import { BatchPanel } from './batchview';
@@ -14,18 +15,18 @@ export function Drawers() {
   const readOnly = d === 'settings' && batch.value.status === 'running';
   return (
     // Keyed by drawer: each opens at the top rather than at the previous drawer's scroll position.
-    <aside key={d} class={`drawer drawer-${d}`} aria-label={TITLES[d]}>
+    <aside key={d} class={`drawer drawer-${d}`} aria-label={trText((TITLES[d]))}>
       <header class="drawer-head">
-        <h2 tabIndex={-1}>{TITLES[d]}</h2>
-        <button type="button" aria-label="Close" onClick={closeDrawer}>×</button>
+        <h2 tabIndex={-1}>{localise(TITLES[d])}</h2>
+        <button type="button" aria-label={trText("Close")} onClick={closeDrawer}>×</button>
       </header>
       <div class="drawer-body">
-        {readOnly && <p class="muted">A batch is running; settings are read-only until it finishes.</p>}
+        {localise(readOnly && <p class="muted">{trText("A batch is running; settings are read-only until it finishes.")}</p>)}
         <fieldset disabled={readOnly} class="plain">
-          {d === 'settings' && <SettingsPanel />}
-          {d === 'assumptions' && <AssumptionsPanel />}
-          {d === 'batch' && <BatchPanel />}
-          {d === 'findings' && <FindingsPanel />}
+          {localise(d === 'settings' && <SettingsPanel />)}
+          {localise(d === 'assumptions' && <AssumptionsPanel />)}
+          {localise(d === 'batch' && <BatchPanel />)}
+          {localise(d === 'findings' && <FindingsPanel />)}
         </fieldset>
       </div>
     </aside>

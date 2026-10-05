@@ -1,3 +1,4 @@
+import { language, localise, msg as trText } from '../i18n';
 import type { ComponentChildren } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 
@@ -32,7 +33,7 @@ function useWidth(): [{ current: HTMLDivElement | null }, number] {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const set = () => setW(Math.max(240, Math.floor(el.clientWidth)));
+    const set = () => { if (el.clientWidth > 0) setW(Math.floor(el.clientWidth)); };
     set();
     const ro = new ResizeObserver(set);
     ro.observe(el);
@@ -54,18 +55,18 @@ function Hatch({ id, color }: { id: string; color: string }) {
 export function Legend({ series, lines = false }: { series: Series[]; lines?: boolean }) {
   return (
     <ul class="flegend">
-      {series.map((s) => (
+      {localise(series.map((s) => (
         <li key={s.label}>
-          {lines ? (
+          {localise(lines ? (
             <svg class="sw-line" width="26" height="10" aria-hidden="true">
               <line x1="1" y1="5" x2="25" y2="5" style={{ stroke: s.color, strokeWidth: 2.5, strokeDasharray: s.dash ?? 'none' }} />
             </svg>
           ) : (
             <span class={`sw${s.hatch ? ' sw-hatch' : ''}${s.outline ? ' sw-outline' : ''}`} style={{ '--sw': s.color } as Record<string, string>} />
-          )}
-          {s.label}
+          ))}
+          {localise(s.label)}
         </li>
-      ))}
+      )))}
     </ul>
   );
 }
@@ -73,20 +74,20 @@ export function Legend({ series, lines = false }: { series: Series[]; lines?: bo
 function YAxis({ ticks, y, x0, x1, fmt, title }: { ticks: number[]; y: (v: number) => number; x0: number; x1: number; fmt: (v: number) => string; title?: string }) {
   return (
     <g class="faxis">
-      {ticks.map((t) => (
+      {localise(ticks.map((t) => (
         <g key={t}>
           <line x1={x0} x2={x1} y1={y(t)} y2={y(t)} class="fgrid" />
-          <text x={x0 - 6} y={y(t)} dy="0.32em" text-anchor="end">{fmt(t)}</text>
+          <text x={x0 - 6} y={y(t)} dy="0.32em" text-anchor="end">{localise(fmt(t))}</text>
         </g>
-      ))}
-      {title && <text x={4} y={12} class="ftitle">{title}</text>}
+      )))}
+      {localise(title && <text x={4} y={12} class="ftitle">{localise(title)}</text>)}
     </g>
   );
 }
 
 /** Stacked bars, one per category; `series` bottom first; values are shares of `yMax`. */
-export function StackedBars({ categories, series, yMax = 1, ticks, fmt, labelLast = false }: {
-  categories: string[]; series: Series[]; yMax?: number; ticks: number[]; fmt: (v: number) => string; labelLast?: boolean;
+export function StackedBars({ categories, axisLabels = categories, series, yMax = 1, ticks, fmt, labelLast = false }: {
+  categories: string[]; axisLabels?: string[]; series: Series[]; yMax?: number; ticks: number[]; fmt: (v: number) => string; labelLast?: boolean;
 }) {
   const [ref, w] = useWidth();
   const [id] = useState(() => `fc${++uid}`);
@@ -97,50 +98,51 @@ export function StackedBars({ categories, series, yMax = 1, ticks, fmt, labelLas
   const band = plotW / categories.length, barW = Math.min(64, band * 0.62);
   const last = categories.length - 1;
   const lastX = PAD.l + band * last + (band - barW) / 2 + barW;
-  // Direct labels for the last bar: segments of at least 2% of the scale, pushed apart to 12 px, top to bottom.
+  // Keep direct labels apart; Thai vowels and tone marks need more vertical room.
   const labels: { y: number; text: string; mid: number }[] = [];
   if (direct) {
     let acc = 0;
     for (const s of series) {
       const v = s.values[last] ?? 0;
-      if (v >= 0.02 * yMax) labels.push({ mid: y(acc + v / 2), y: y(acc + v / 2), text: `${s.short ?? s.label} ${fmt(v)}` });
+      if (v >= 0.02 * yMax) labels.push({ mid: y(acc + v / 2), y: y(acc + v / 2), text: `${trText(s.short ?? s.label)} ${fmt(v)}` });
       acc += v;
     }
     labels.sort((a, b) => a.mid - b.mid);
-    for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + 12);
+    const labelGap = language.value === 'th' ? 22 : 12; // Room for Noto Thai vowels and tone marks in WebKit.
+    for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + labelGap);
     const overflow = labels.length ? labels[labels.length - 1].y - (PAD.t + plotH) : 0;
     if (overflow > 0) for (const l of labels) l.y -= overflow;
   }
   return (
     <div ref={ref} class="fsvg">
       <svg width={w} height={H} aria-hidden="true">
-        <defs>{series.map((s, k) => s.hatch && <Hatch key={k} id={`${id}-h${k}`} color={s.color} />)}</defs>
+        <defs>{localise(series.map((s, k) => s.hatch && <Hatch key={k} id={`${id}-h${k}`} color={s.color} />))}</defs>
         <YAxis ticks={ticks} y={y} x0={PAD.l} x1={w - padR} fmt={fmt} />
-        {categories.map((c, i) => {
+        {localise(categories.map((c, i) => {
           const x = PAD.l + band * i + (band - barW) / 2;
           let acc = 0;
           return (
             <g key={c}>
-              {series.map((s, k) => {
+              {localise(series.map((s, k) => {
                 const v = s.values[i] ?? 0;
                 const y0 = y(acc), y1 = y(acc + v);
                 acc += v;
                 return v > 0 ? (
                   <rect key={k} x={x} y={y1} width={barW} height={Math.max(0, y0 - y1)} class={s.outline ? 'fseg fseg-outline' : 'fseg'} style={{ fill: s.hatch ? `url(#${id}-h${k})` : s.color }}>
-                    <title>{`${c} · ${s.label}: ${fmt(v)}`}</title>
+                    <title>{localise(`${trText(c)} · ${trText(s.label)}: ${fmt(v)}`)}</title>
                   </rect>
                 ) : null;
-              })}
-              <text x={x + barW / 2} y={H - 8} text-anchor="middle" class="flabel">{c}</text>
+              }))}
+              <text x={x + barW / 2} y={H - 8} text-anchor="middle" class="flabel">{localise(axisLabels[i])}</text>
             </g>
           );
-        })}
-        {labels.map((l) => (
+        }))}
+        {localise(labels.map((l) => (
           <g key={l.text} class="fdirect">
             <line x1={lastX + 2} x2={lastX + 10} y1={l.mid} y2={l.y} />
-            <text x={lastX + 13} y={l.y} dy="0.32em">{l.text}</text>
+            <text x={lastX + 13} y={l.y} dy="0.32em">{localise(l.text)}</text>
           </g>
-        ))}
+        )))}
       </svg>
     </div>
   );
@@ -156,23 +158,23 @@ export function GroupedBars({ categories, series, yMax, ticks, fmt }: { categori
     <div ref={ref} class="fsvg">
       <svg width={w} height={H} aria-hidden="true">
         <YAxis ticks={ticks} y={y} x0={PAD.l} x1={w - PAD.r} fmt={fmt} />
-        {categories.map((c, i) => {
+        {localise(categories.map((c, i) => {
           const x0 = PAD.l + band * i + (band - inner) / 2;
           return (
             <g key={c}>
-              {series.map((s, k) => {
+              {localise(series.map((s, k) => {
                 const v = s.values[i];
                 if (v === null || v === undefined) return null;
                 return (
                   <rect key={k} x={x0 + k * barW + 0.5} y={y(v)} width={Math.max(1, barW - 1)} height={Math.max(0, y(0) - y(v))} style={{ fill: s.color }}>
-                    <title>{`${c} · ${s.label}: ${fmt(v)}`}</title>
+                    <title>{localise(`${trText(c)} · ${trText(s.label)}: ${fmt(v)}`)}</title>
                   </rect>
                 );
-              })}
-              <text x={x0 + inner / 2} y={H - 8} text-anchor="middle" class="flabel">{c}</text>
+              }))}
+              <text x={x0 + inner / 2} y={H - 8} text-anchor="middle" class="flabel">{localise(c)}</text>
             </g>
           );
-        })}
+        }))}
       </svg>
     </div>
   );
@@ -202,24 +204,24 @@ export function Lines({ x, series, yMax, ticks, fmt, xTicks, xFmt, xRange, rule,
   return (
     <div ref={ref} class="fsvg">
       <svg width={w} height={H} aria-hidden="true">
-        <YAxis ticks={ticks} y={sy} x0={PAD.l} x1={w - PAD.r} fmt={fmt} title={yTitle} />
-        {xTicks.filter((_, i) => i % stepEvery === 0).map((t) => {
+        <YAxis ticks={ticks} y={sy} x0={PAD.l} x1={w - PAD.r} fmt={fmt} title={trText((yTitle))} />
+        {localise(xTicks.filter((_, i) => i % stepEvery === 0).map((t) => {
           // Edge labels anchor inward so they are never clipped.
           const px = sx(t);
           const anchor = px - PAD.l < 16 ? 'start' : w - PAD.r - px < 16 ? 'end' : 'middle';
-          return <text key={t} x={anchor === 'end' ? w - 2 : px} y={H - 8} text-anchor={anchor} class="flabel">{xFmt(t)}</text>;
-        })}
-        {rule && (
+          return <text key={t} x={anchor === 'end' ? w - 2 : px} y={H - 8} text-anchor={anchor} class="flabel">{localise(xFmt(t))}</text>;
+        }))}
+        {localise(rule && (
           <g class="frule">
             <line x1={sx(rule.x)} x2={sx(rule.x)} y1={top} y2={top + plotH} />
-            <text x={sx(rule.x) + 4} y={top + 10}>{rule.label}</text>
+            <text x={sx(rule.x) + 4} y={top + 10}>{localise(rule.label)}</text>
           </g>
-        )}
-        {series.map((s) => (
-          <path key={s.label} d={path(s.values)} style={{ fill: 'none', stroke: s.color, strokeWidth: 2.25, strokeLinejoin: 'round', strokeDasharray: s.dash ?? 'none' }}>
-            <title>{s.label}</title>
-          </path>
         ))}
+        {localise(series.map((s) => (
+          <path key={s.label} d={path(s.values)} style={{ fill: 'none', stroke: s.color, strokeWidth: 2.25, strokeLinejoin: 'round', strokeDasharray: s.dash ?? 'none' }}>
+            <title>{localise(s.label)}</title>
+          </path>
+        )))}
       </svg>
     </div>
   );
@@ -228,8 +230,8 @@ export function Lines({ x, series, yMax, ticks, fmt, xTicks, xFmt, xRange, rule,
 /** A table that may scroll sideways: focusable and named, so keyboard users can scroll it too. */
 export function ScrollTable({ label, children }: { label: string; children: ComponentChildren }) {
   return (
-    <div class="table-scroll" tabIndex={0} role="region" aria-label={label}>
-      {children}
+    <div class="table-scroll" tabIndex={0} role="region" aria-label={trText((label))}>
+      {localise(children)}
     </div>
   );
 }
@@ -242,18 +244,18 @@ export function ChartFigure({ title, label, note, legend, lineLegend = false, ta
   return (
     <figure class="fchart">
       <figcaption>
-        <b>{title}</b>
-        <button type="button" class="linklike" onClick={() => setAsTable(!asTable)}>{asTable ? 'Show chart' : 'Show table'}</button>
+        <b>{localise(title)}</b>
+        <button type="button" class="linklike" onClick={() => setAsTable(!asTable)}>{localise(asTable ? 'Show chart' : 'Show table')}</button>
       </figcaption>
-      {asTable ? (
-        <ScrollTable label={`${title}: table`}>{table}</ScrollTable>
+      {localise(asTable ? (
+        <ScrollTable label={trText((trText("{v0}: table", { v0: (title) })))}>{localise(table)}</ScrollTable>
       ) : (
-        <div role="img" aria-label={label}>
-          {children}
-          {legend && <Legend series={legend} lines={lineLegend} />}
+        <div role="img" aria-label={trText((label))}>
+          {localise(children)}
+          {localise(legend && <Legend series={legend} lines={lineLegend} />)}
         </div>
-      )}
-      {note && <p class="fchart-note muted">{note}</p>}
+      ))}
+      {localise(note && <p class="fchart-note muted">{localise(note)}</p>)}
     </figure>
   );
 }

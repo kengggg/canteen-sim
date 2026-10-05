@@ -245,3 +245,24 @@ h3 {
     transition: none !important;
   }
 }
+
+/* Thai needs room above vowels and tone marks, and word wrapping without letter spacing. */
+/* Embedded Thai glyphs; Latin text uses the system stack. See assets/fonts/OFL.txt. */
+@font-face {
+  font-family: 'Noto Sans Thai Looped';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/noto-sans-thai-looped-thai-400.woff2') format('woff2');
+  unicode-range: U+0E01-0E5B;
+}
+:root:lang(th) {
+  --font: 'Noto Sans Thai Looped', system-ui, -apple-system, 'Leelawadee UI', Thonburi, Tahoma, sans-serif;
+}
+html:lang(th) body { line-height: 1.7; }
+html:lang(th) .eyebrow { letter-spacing: normal; text-transform: none; }
+html:lang(th) .story-intro h1 { line-height: 1.4; letter-spacing: normal; max-width: 26em; }
+html:lang(th) button, html:lang(th) select { line-height: 1.5; }
+.language-bar { display: flex; justify-content: flex-end; max-width: 1120px; margin: 0 auto; padding: 12px 16px 0; }
+.language-picker { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-1); }
+.language-picker select { min-height: 44px; padding: 6px 8px; }
