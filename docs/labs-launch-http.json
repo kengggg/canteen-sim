@@ -1,0 +1,96 @@
+{
+  "checkedAt": "2026-10-05T16:49:34.578Z",
+  "origin": "https://labs.patipat.org",
+  "checks": [
+    {
+      "method": "GET",
+      "path": "/",
+      "status": 200,
+      "bytes": 3714,
+      "location": null,
+      "contentType": "text/html",
+      "sha256": "c7b58215911098ba87136b372f214679e178d2277d480623476b5c44428eac25"
+    },
+    {
+      "method": "GET",
+      "path": "/styles.css",
+      "status": 200,
+      "bytes": 5323,
+      "location": null,
+      "contentType": "text/css",
+      "sha256": "83cc239586ffbb88a25f93cf6a84f515c3650621f4e9701f7abd4655a76f3fd7"
+    },
+    {
+      "method": "GET",
+      "path": "/canteen?lang=en",
+      "status": 308,
+      "bytes": 0,
+      "location": "/canteen/?lang=en",
+      "contentType": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/canteen/",
+      "status": 200,
+      "bytes": 1566283,
+      "location": null,
+      "contentType": "text/html",
+      "sha256": "fb6260f93787ffd853470b482a74a1192c66240b2cb0fd5e889bafa77b9f4314"
+    },
+    {
+      "method": "GET",
+      "path": "/canteen/index.html?lang=en",
+      "status": 307,
+      "bytes": 0,
+      "location": "/canteen/?lang=en",
+      "contentType": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/canteen/og/canteen-sim-manga-v1.jpg",
+      "status": 200,
+      "bytes": 499815,
+      "location": null,
+      "contentType": "image/jpeg",
+      "sha256": "ed79d6daed05c551f0c899bf77342f1ca206a4b5eaa2c9a85f4457b49d44b546"
+    },
+    {
+      "method": "GET",
+      "path": "/canteen/missing.jpg",
+      "status": 404,
+      "bytes": 0,
+      "location": null,
+      "contentType": null,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "method": "GET",
+      "path": "/missing-lab/",
+      "status": 404,
+      "bytes": 779,
+      "location": null,
+      "contentType": "text/html",
+      "sha256": "889558d4e7fb59b94e58e91129a9b4d703548012512840f8f398aaaf6fe211b6"
+    },
+    {
+      "method": "GET",
+      "path": "/canteen-other/",
+      "status": 404,
+      "bytes": 779,
+      "location": null,
+      "contentType": "text/html",
+      "sha256": "889558d4e7fb59b94e58e91129a9b4d703548012512840f8f398aaaf6fe211b6"
+    },
+    {
+      "method": "HEAD",
+      "path": "/canteen/",
+      "status": 200,
+      "bytes": 0,
+      "location": null,
+      "contentType": "text/html",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
