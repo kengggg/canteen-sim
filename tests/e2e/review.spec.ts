@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { waitForRenderedScene } from './helpers';
 
 type Hook = {
   config(): { crowd: { totalPeople: number }; reserve: { percentA: number } };
@@ -155,6 +156,7 @@ test('context loss pauses the 3D view, the sim keeps running, and Restore brings
   const errors: string[] = [];
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
   await page.goto('/?lang=en');
+  await waitForRenderedScene(page);
   await page.evaluate(() => (window as unknown as { __canteen: { loseContext(): void } }).__canteen.loseContext());
   await expect(page.getByText('3D view paused').first()).toBeVisible();
   await page.getByRole('button', { name: 'Play' }).click();

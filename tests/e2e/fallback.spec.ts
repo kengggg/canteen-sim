@@ -1,9 +1,12 @@
 import { expect, test } from '@playwright/test';
+import { waitForRenderedScene } from './helpers';
 
 type Hook = { batch(n: number, mode?: 'auto' | 'fallback'): Promise<{ hashes: [string, number][]; usedFallback: boolean }> };
 
 test('with CSP worker-src none, a 2-seed batch completes through the fallback with the worker hashes', async ({ page, browser }) => {
   await page.goto('/?lang=en');
+  // Do not race the worker health check against initial software-renderer compilation in CI.
+  await waitForRenderedScene(page);
   const withWorkers = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.batch(2));
   expect(withWorkers.usedFallback).toBe(false);
   const ctx = await browser.newContext();
@@ -13,6 +16,7 @@ test('with CSP worker-src none, a 2-seed batch completes through the fallback wi
     await route.fulfill({ response: res, headers: { ...res.headers(), 'content-security-policy': "worker-src 'none'" } });
   });
   await p2.goto('/?lang=en');
+  await waitForRenderedScene(p2);
   const r = await p2.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.batch(2));
   expect(r.usedFallback).toBe(true);
   expect(r.hashes).toEqual(withWorkers.hashes);

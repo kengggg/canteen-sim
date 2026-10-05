@@ -91,9 +91,26 @@ export function StackedBars({ categories, axisLabels = categories, series, yMax 
 }) {
   const [ref, w] = useWidth();
   const [id] = useState(() => `fc${++uid}`);
+  const [labelMetrics, setLabelMetrics] = useState({ above: 10, below: 4 });
   const direct = labelLast && w >= 520;
+  // SVG font bounds differ across engines, especially for Thai tone marks and mixed-script labels.
+  // Measure the actual face instead of relying on a fixed line gap.
+  useLayoutEffect(() => {
+    if (!direct || !ref.current) return;
+    let above = 0, below = 0;
+    for (const text of ref.current.querySelectorAll<SVGTextElement>('.fdirect text')) {
+      const box = text.getBBox(), baseline = Number(text.getAttribute('y'));
+      above = Math.max(above, baseline - box.y);
+      below = Math.max(below, box.y + box.height - baseline);
+    }
+    const next = { above: Math.ceil(above * 10) / 10, below: Math.ceil(below * 10) / 10 };
+    if (next.above !== labelMetrics.above || next.below !== labelMetrics.below) setLabelMetrics(next);
+  }, [direct, language.value, series]);
+  const labelGap = labelMetrics.above + labelMetrics.below + 2;
+  const labelCount = series.filter((s) => (s.values[categories.length - 1] ?? 0) >= 0.02 * yMax).length;
+  const height = direct ? Math.max(H, PAD.t + PAD.b + labelCount * labelGap) : H;
   const padR = direct ? 190 : PAD.r;
-  const plotW = w - PAD.l - padR, plotH = H - PAD.t - PAD.b;
+  const plotW = w - PAD.l - padR, plotH = height - PAD.t - PAD.b;
   const y = (v: number) => PAD.t + plotH - (v / yMax) * plotH;
   const band = plotW / categories.length, barW = Math.min(64, band * 0.62);
   const last = categories.length - 1;
@@ -108,14 +125,14 @@ export function StackedBars({ categories, axisLabels = categories, series, yMax 
       acc += v;
     }
     labels.sort((a, b) => a.mid - b.mid);
-    const labelGap = language.value === 'th' ? 22 : 12; // Room for Noto Thai vowels and tone marks in WebKit.
+    if (labels.length) labels[0].y = Math.max(labels[0].y, PAD.t + labelMetrics.above);
     for (let i = 1; i < labels.length; i++) labels[i].y = Math.max(labels[i].y, labels[i - 1].y + labelGap);
-    const overflow = labels.length ? labels[labels.length - 1].y - (PAD.t + plotH) : 0;
+    const overflow = labels.length ? labels[labels.length - 1].y + labelMetrics.below - (PAD.t + plotH) : 0;
     if (overflow > 0) for (const l of labels) l.y -= overflow;
   }
   return (
     <div ref={ref} class="fsvg">
-      <svg width={w} height={H} aria-hidden="true">
+      <svg width={w} height={height} aria-hidden="true">
         <defs>{localise(series.map((s, k) => s.hatch && <Hatch key={k} id={`${id}-h${k}`} color={s.color} />))}</defs>
         <YAxis ticks={ticks} y={y} x0={PAD.l} x1={w - padR} fmt={fmt} />
         {localise(categories.map((c, i) => {
@@ -133,7 +150,7 @@ export function StackedBars({ categories, axisLabels = categories, series, yMax 
                   </rect>
                 ) : null;
               }))}
-              <text x={x + barW / 2} y={H - 8} text-anchor="middle" class="flabel">{localise(axisLabels[i])}</text>
+              <text x={x + barW / 2} y={height - 8} text-anchor="middle" class="flabel">{localise(axisLabels[i])}</text>
             </g>
           );
         }))}

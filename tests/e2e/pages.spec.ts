@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type BrowserContext } from '@playwright/test';
+import { waitForRenderedScene } from './helpers';
 
 /**
  * Static hosting: the built dist/index.html served as a GitHub Pages project site (https://<user>.github.io/<repo>/) and
@@ -41,6 +42,7 @@ test('batches use real workers on Pages, and a shared #v= link loads its setting
   await page.goto(`${SITE}?lang=en#v=1&m=1&seed=7&crowd.totalPeople=900`);
   const cfg = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.config());
   expect([cfg.seed, cfg.crowd.totalPeople]).toEqual([7, 900]);
+  await waitForRenderedScene(page);
   const r = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.batch(2));
   expect(r.hashes).toHaveLength(10);
   expect(r.usedFallback).toBe(false);

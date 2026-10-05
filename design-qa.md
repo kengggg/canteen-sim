@@ -1,6 +1,22 @@
 # Canteen Sim implementation review — 2026-10-05
 
-## Latest review: Thai default and Noto Sans Thai Looped
+## Deployment follow-up: browser portability
+
+The [first Linux release run](https://github.com/kengggg/canteen-sim/actions/runs/37299840881) passed
+lint, typechecking, all 276 unit tests and all 181 model-sanity checks, then passed 97 of 101 browser cases.
+It exposed two startup-sensitive Chromium checks, a Firefox test that assumed WebGL availability, and
+overlapping Thai direct labels in Firefox. Publishing was blocked by the failed browser step.
+
+Direct labels now use their actual SVG font bounds, with enough chart height to contain them. Worker
+and context-loss tests wait for the first rendered scene, and language-state comparisons retain a null
+renderer when WebGL is unavailable. An additional regression checks language switching with WebGL
+explicitly disabled. Failed release checks now retain their screenshots and error contexts.
+
+The 13 affected Chromium/WebKit cases pass across the targeted run and corrected no-WebGL assertion
+rerun. Lint, typechecking and the hosting build pass. The single HTML is 1,566,056 bytes, under 1.5 MiB.
+Firefox remains unavailable on this Mac; the full Linux browser suite is still required before deployment.
+
+## Previous review: Thai default and Noto Sans Thai Looped
 
 **Passed locally in Chromium and WebKit.** Thai is now the default for new visitors, including browsers
 whose primary language is English. Explicit language links and saved choices still override the default.

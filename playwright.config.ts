@@ -9,7 +9,7 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   reporter: [['list']],
-  use: { baseURL: 'http://localhost:4173' },
+  use: { baseURL: 'http://localhost:4173', screenshot: 'only-on-failure' },
   webServer: { command: 'npm run build && npm run preview', url: 'http://localhost:4173', reuseExistingServer: true, timeout: 180_000 },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'], ...swiftshader } },

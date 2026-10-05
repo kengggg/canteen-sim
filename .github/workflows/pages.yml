@@ -32,6 +32,13 @@ jobs:
       - run: npm run test:sanity
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-failure-details
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
       - run: npm run build:pages
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

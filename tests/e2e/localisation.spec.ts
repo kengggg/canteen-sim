@@ -7,13 +7,12 @@ const picker = (page: Page) => page.getByRole('combobox', { name: 'Language / à¸
 const button = (page: Page, english: string) => page.getByRole('button', { name: th(english), exact: true });
 type Hook = {
   config(): unknown;
-  renderer(): { yaw: number; targets: number[]; info: { textures: number; geometries: number } };
+  renderer(): { yaw: number; targets: number[]; info: { textures: number; geometries: number } } | null;
   batch(n: number): Promise<{ hashes: [string, number][]; csvFirstRow: string }>;
 };
 const state = (page: Page) => page.evaluate(() => {
   const hook = (window as unknown as { __canteen: Hook }).__canteen;
-  const renderer = hook.renderer();
-  return { config: hook.config(), yaw: renderer.yaw, targets: renderer.targets, resources: renderer.info,
+  return { config: hook.config(), renderer: hook.renderer(),
     clock: document.querySelector('.clock')!.textContent,
     numbers: [...document.querySelectorAll('.live .num')].map((el) => el.textContent!.match(/[\d.,]+/g)) };
 });
@@ -75,6 +74,30 @@ test('switching language preserves the paused lunch, camera, pending edits and s
   expect((await research.locator('.research-detail td').allTextContents()).map(numbers)).toEqual(cells.map(numbers));
   expect(await state(page)).toEqual(before);
   expect(errors).toEqual([]);
+});
+
+test('language switching preserves the lunch when WebGL is unavailable', async ({ page }) => {
+  await page.addInitScript(() => {
+    const getContext = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', {
+      value(this: HTMLCanvasElement, kind: string, ...args: unknown[]) {
+        if (kind === 'webgl' || kind === 'webgl2') return null;
+        return Reflect.apply(getContext, this, [kind, ...args]);
+      },
+    });
+  });
+  await page.goto('/?lang=en');
+  await expect(page.getByText('The 3D view needs WebGL').first()).toBeVisible();
+  await page.locator('#skip-to').fill('12:10');
+  await page.getByRole('button', { name: 'Skip to', exact: true }).click();
+  await expect(page.locator('.clock')).toHaveText('12:10');
+  const before = await state(page);
+  expect(before.renderer).toBeNull();
+  await picker(page).selectOption('th');
+  await expect(page.getByText(th('The 3D view needs WebGL, which this browser has blocked. Live numbers and batch runs still work.')).first()).toBeVisible();
+  expect(await state(page)).toEqual(before);
+  await picker(page).selectOption('en');
+  expect(await state(page)).toEqual(before);
 });
 
 test('Thai and English produce identical run hashes, CSV numbers and settings JSON', async ({ page }) => {
@@ -160,6 +183,10 @@ test('Thai chart labels stay inside their plots and do not overlap at phone and 
         if (axis[i - 1].getBoundingClientRect().right > axis[i].getBoundingClientRect().left - 2) issues.push(`overlap: ${axis[i].textContent}`);
       }
       const labels = [...plot.querySelectorAll('.fdirect text')];
+      for (const text of labels) {
+        const box = text.getBoundingClientRect();
+        if (box.top < bounds.top - 1 || box.bottom > bounds.bottom + 1) issues.push(`clipped direct label: ${text.textContent}`);
+      }
       for (let i = 1; i < labels.length; i++) {
         if (labels[i - 1].getBoundingClientRect().bottom > labels[i].getBoundingClientRect().top - 1) issues.push(`overlapping marks: ${labels[i].textContent}`);
       }
