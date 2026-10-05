@@ -21,6 +21,9 @@
     "golden:update": "vite-node scripts/golden.ts",
     "build:artifact": "npm run build && vite-node scripts/artifact.ts",
     "build:pages": "npm run localise && vite build && vite-node scripts/pages.ts",
+    "build:cloudflare": "npm run build:pages && vite-node scripts/cloudflare.ts",
+    "dev:cloudflare": "wrangler dev --port 8788",
+    "deploy:cloudflare": "npm run build:cloudflare && wrangler deploy",
     "bcheck": "vite-node scripts/bcheck.ts",
     "localise": "vite-node scripts/localise.ts",
     "predev": "npm run localise",
@@ -37,7 +40,8 @@
     "typescript-eslint": "^8.70.1",
     "vite": "^7.3.6",
     "vite-plugin-singlefile": "^2.3.3",
-    "vitest": "^3.2.7"
+    "vitest": "^3.2.7",
+    "wrangler": "4.147.0"
   },
   "dependencies": {
     "@preact/signals": "^2.11.2",

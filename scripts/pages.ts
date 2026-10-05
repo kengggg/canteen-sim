@@ -1,5 +1,5 @@
 /**
- * npm run build:pages — dist/ ready to host (the Pages workflow deploys it; any static host also works): the single-file
+ * npm run build:pages — a portable dist/ for any static host (also used by build:cloudflare): the single-file
  * index.html, checked to be self-contained and within the 1.5 MB budget, its social-preview image, and .nojekyll.
  */
 import { readFileSync, writeFileSync } from 'node:fs';

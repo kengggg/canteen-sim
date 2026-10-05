@@ -1,5 +1,9 @@
 node_modules/
 dist/
+dist-cloudflare/
+.wrangler/
+.dev.vars*
+.env*
 coverage/
 playwright-report/
 test-results/

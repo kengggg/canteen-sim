@@ -3,17 +3,17 @@ import { expect, test, type BrowserContext } from '@playwright/test';
 import { waitForRenderedScene } from './helpers';
 
 /**
- * Static hosting: the built dist/index.html served as a GitHub Pages project site (https://<user>.github.io/<repo>/) and
- * from the root of a custom domain (Cloudflare Pages), with no build server, no claude.ai viewer and no sandbox.
+ * Static hosting: the built dist/index.html served at the production /canteen/ path and at a generic static root,
+ * with no build server, no claude.ai viewer and no sandbox.
  * Everything the page needs is inside the one file.
  */
-const SITE = 'https://kengggg.github.io/canteen-sim/';
+const SITE = 'https://labs.patipat.org/canteen/';
 const html = readFileSync(new URL('../../dist/index.html', import.meta.url));
 
 async function pages(context: BrowserContext, dismissed = true) {
-  await context.route('https://kengggg.github.io/**', (route) => {
+  await context.route('https://labs.patipat.org/**', (route) => {
     const u = new URL(route.request().url());
-    if (u.pathname === '/canteen-sim/' || u.pathname === '/canteen-sim/index.html') return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
+    if (u.pathname === '/canteen/' || u.pathname === '/canteen/index.html') return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
     return route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
   });
   if (dismissed) await context.addInitScript(() => localStorage.setItem('canteen-sim:howto-dismissed', '1'));
@@ -21,7 +21,7 @@ async function pages(context: BrowserContext, dismissed = true) {
 
 type Hook = { config(): { seed: number; crowd: { totalPeople: number } }; batch(n: number): Promise<{ hashes: [string, number][]; usedFallback: boolean }> };
 
-test('served as a GitHub Pages project site, the page runs with no other requests and no console errors', async ({ page, context }) => {
+test('served at the labs /canteen/ path, the page runs with no other requests and no console errors', async ({ page, context }) => {
   await pages(context);
   const requests: string[] = [];
   const errors: string[] = [];
@@ -37,7 +37,7 @@ test('served as a GitHub Pages project site, the page runs with no other request
   expect(errors).toEqual([]);
 });
 
-test('batches use real workers on Pages, and a shared #v= link loads its settings', async ({ page, context }) => {
+test('hosted batches use real workers, and a shared #v= link loads its settings', async ({ page, context }) => {
   await pages(context);
   await page.goto(`${SITE}?lang=en#v=1&m=1&seed=7&crowd.totalPeople=900`);
   const cfg = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.config());
@@ -48,7 +48,7 @@ test('batches use real workers on Pages, and a shared #v= link loads its setting
   expect(r.usedFallback).toBe(false);
 });
 
-test('Download CSV and Download JSON save real files on Pages', async ({ page, context }) => {
+test('hosted Download CSV and Download JSON save real files', async ({ page, context }) => {
   await pages(context);
   await page.goto(`${SITE}?lang=en`);
   await page.getByRole('button', { name: 'Settings' }).click();
@@ -62,7 +62,7 @@ test('Download CSV and Download JSON save real files on Pages', async ({ page, c
   expect((await csv).suggestedFilename()).toBe('canteen-sim-batch.csv');
 });
 
-test('the self-test runs at ?selftest=1 on Pages', async ({ page, context }) => {
+test('the hosted self-test runs at ?selftest=1', async ({ page, context }) => {
   test.setTimeout(600_000);
   await pages(context);
   await page.goto(`${SITE}?selftest=1`);
@@ -75,9 +75,9 @@ test('the self-test runs at ?selftest=1 on Pages', async ({ page, context }) => 
   }
 });
 
-test('served from the root of a custom domain (Cloudflare Pages), the page runs alone and #findings opens the panel', async ({ page, context }) => {
-  const ROOT = 'https://canteen.lab.patipat.org/';
-  await context.route('https://canteen.lab.patipat.org/**', (route) => {
+test('served from a generic static root, the page runs alone and #findings opens the panel', async ({ page, context }) => {
+  const ROOT = 'https://static.example/';
+  await context.route('https://static.example/**', (route) => {
     const u = new URL(route.request().url());
     if (u.pathname === '/' || u.pathname === '/index.html') return route.fulfill({ status: 200, contentType: 'text/html; charset=utf-8', body: html });
     return route.fulfill({ status: 404, contentType: 'text/plain', body: 'not found' });
@@ -92,4 +92,17 @@ test('served from the root of a custom domain (Cloudflare Pages), the page runs 
   await expect(page.getByRole('dialog', { name: 'How this works' })).toHaveCount(0);
   expect(requests.filter((u) => !u.startsWith('blob:') && !u.startsWith('data:'))).toEqual([`${ROOT}?lang=en`]);
   expect(errors).toEqual([]);
+});
+
+test('language changes preserve the labs path, shared settings and production sharing metadata', async ({ page, context }) => {
+  await pages(context);
+  await page.goto(`${SITE}?lang=en#v=1&m=1&seed=7&crowd.totalPeople=900`);
+  await page.getByRole('combobox', { name: 'Language / ภาษา', exact: true }).last().selectOption('th');
+  await expect(page).toHaveURL(/\/canteen\/\?lang=th#v=1&m=1&seed=7&crowd\.totalPeople=900$/);
+  await page.getByRole('combobox', { name: 'Language / ภาษา', exact: true }).last().selectOption('en');
+  await expect(page).toHaveURL(/\/canteen\/\?lang=en#v=1&m=1&seed=7&crowd\.totalPeople=900$/);
+  const cfg = await page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.config());
+  expect([cfg.seed, cfg.crowd.totalPeople]).toEqual([7, 900]);
+  await expect(page.locator('link[rel="canonical"]')).toHaveAttribute('href', SITE);
+  await expect(page.locator('meta[property="og:image"]')).toHaveAttribute('content', `${SITE}og/canteen-sim-manga-v1.jpg`);
 });
