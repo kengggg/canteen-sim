@@ -40,10 +40,24 @@ export const frameTick = signal(0);
 export const playing = signal(false);
 export const speed = signal(60);
 export const drawer = signal<Drawer>(null);
+let drawerOpener: HTMLElement | null = null;
 /** Open a drawer and move focus to its heading, for links that jump between panels (spec §11.11). */
 export function openDrawer(d: Exclude<Drawer, null>): void {
+  const active = document.activeElement;
+  if (active instanceof HTMLElement && active !== document.body && !active.closest('.drawer')) drawerOpener = active;
   drawer.value = d;
   requestAnimationFrame(() => document.querySelector<HTMLElement>('.drawer-head h2')?.focus());
+}
+/** A keyboard reader resumes from the control that opened the panel. */
+export function closeDrawer(): void {
+  const fallback = document.querySelector<HTMLElement>('.topbar nav button[aria-pressed="true"]');
+  const target = drawerOpener?.isConnected ? drawerOpener : fallback;
+  drawer.value = null;
+  drawerOpener = null;
+  requestAnimationFrame(() => target?.focus());
+}
+export function toggleDrawer(d: Exclude<Drawer, null>): void {
+  if (drawer.value === d) closeDrawer(); else openDrawer(d);
 }
 export const focusSetting = signal<string | null>(null);
 export const howto = signal(false);

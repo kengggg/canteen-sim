@@ -1,4 +1,4 @@
-# Checks every pull request: lint, types, unit tests and the single-file build.
+# Checks every pull request, including model invariants and browser regressions.
 # Pushes to main run the same checks in the Pages workflow before it deploys.
 name: CI
 
@@ -21,4 +21,7 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - run: npm run test:sanity
+      - run: npx playwright install --with-deps chromium firefox webkit
+      - run: npm run test:e2e
       - run: npm run build:pages

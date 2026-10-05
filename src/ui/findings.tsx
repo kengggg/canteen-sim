@@ -11,6 +11,8 @@ import { aboutTwoThirds, bracket, fold, list, pc, range, sgn, straddlesZero } fr
 import { clock, int, num } from './format';
 import { SEAT_LABELS } from './labels';
 import { applied, openDrawer } from './store';
+import { SensitivityExplorer } from './sensitivity';
+import { ResearchExplorer } from './research';
 
 /** Findings panel (spec §11.13): what the default evidence shows. Every number comes from the data; the text only formats it. */
 
@@ -42,7 +44,7 @@ const pctTick = (v: number) => `${Math.round(v * 100)}%`;
 function Section({ id, title, children }: { id: string; title: string; children: ComponentChildren }) {
   return (
     <section class="fsection" aria-labelledby={`f-${id}`}>
-      <h3 id={`f-${id}`}>{title}</h3>
+      <h3 id={`f-${id}`} tabIndex={-1}>{title}</h3>
       {children}
     </section>
   );
@@ -99,7 +101,7 @@ function InShort({ m }: { m: FindingsModel }) {
           <b>{c.minShare25 >= 0.5 ? 'A quarter reserving does most of the damage:' : 'A quarter reserving already does part of the damage:'}</b>{' '}
           {aboutTwoThirds(c.shares25) ? 'about two-thirds of ' : ''}the leaving, seat-use and throughput losses ({range(Math.min(...c.shares25), Math.max(...c.shares25), 0, 100, '%')}).
         </li>
-        <li><b>The cause is idle seats that look taken.</b> With every group reserving, {pc(m.reservedEmpty['1'])} of seats at the busiest hour are reserved with nobody in them ({pc(m.reservedEmpty['0.25'])} at 25%). From the door a table with an object looks taken, so {pc(l1.door, 1)} of arrivals turn round at once, against {pc(l0.door, 1)} under free flow.</li>
+        <li><b>Idle seats can look taken in this model.</b> With every group reserving, {pc(m.reservedEmpty['1'])} of seats at the busiest hour are reserved with nobody in them ({pc(m.reservedEmpty['0.25'])} at 25%). From the door a table with an object looks taken, so {pc(l1.door, 1)} of arrivals turn round at once, against {pc(l0.door, 1)} under free flow.</li>
         {c.claimedHelped && c.reserversHurt && c.othersHurt && (
           <li><b>Who pays:</b> groups that get a table leave less often than the same groups under free flow (they got past the door and met shorter queues), but reserving groups as a whole, and everyone else, leave more often.</li>
         )}
@@ -110,7 +112,7 @@ function InShort({ m }: { m: FindingsModel }) {
         {c.robustAllBetter ? (
           <li><b>It holds beyond the defaults.</b> Fewer people left without eating under free flow in all {m.robust.length} settings tried, by {range(Math.min(...gaps), Math.max(...gaps), 1)} percentage points.</li>
         ) : (
-          <li><b>Beyond the defaults, results vary.</b> Fewer people left without eating under free flow in {betterIn} of the {m.robust.length} settings tried; the difference is not clear with {list(m.robust.filter((r) => r.left.lo <= 0).map((r) => `“${r.label}”`))}.</li>
+          <li><b>Beyond the defaults, results vary.</b> In the earlier checks, fewer people left without eating under free flow in {betterIn} of the {m.robust.length} settings tried; the difference is not clear with {list(m.robust.filter((r) => r.left.lo <= 0).map((r) => `“${r.label}”`))}. The 36-setting explorer above extends those checks.</li>
         )}
       </ul>
     </Section>
@@ -469,7 +471,7 @@ function Generalises({ m }: { m: FindingsModel }) {
   const allBetter = checks(m).robustAllBetter;
   return (
     <Section id="general" title="How far it generalises">
-      <p>The comparison of 100% against 0% reserving was also run under {rows.length - 1} other settings, {m.n} lunches each. {allBetter ? 'In every setting, fewer people left without eating under free flow and peak seat use was higher, and every 95% range lies on free flow’s side of zero.' : 'Free flow did not win everywhere; see the table.'}</p>
+      <p>The earlier comparison of 100% against 0% reserving was also run under {rows.length - 1} other settings, {m.n} lunches each. These original checks are retained below; the 36-setting explorer above includes further assumptions and combinations. {allBetter ? 'In every original setting, fewer people left without eating under free flow and peak seat use was higher, and every 95% range lies on free flow’s side of zero.' : 'Free flow did not win everywhere; see the table.'}</p>
       <ScrollTable label="100% against 0% reserving under other settings">
         <table class="data">
           <thead>
@@ -491,7 +493,7 @@ function Generalises({ m }: { m: FindingsModel }) {
       </ScrollTable>
       <ul class="fbullets">
         {lo.left.adv > 0 && <li><b>The size of the effect varies {fold(hi.left.adv / lo.left.adv)}:</b> {sgn(lo.left.adv)} pp with “{lo.label}”, {sgn(hi.left.adv)} pp with “{hi.label}”.</li>}
-        {queuesOnly && base && <li><b>How much comes from the view at the door.</b> If arriving groups judged only the queues, not the seating, the gap in leaving would be {sgn(queuesOnly.left.adv)} pp{bracket(queuesOnly.left.lo, queuesOnly.left.hi, 1)} instead of {sgn(base.left.adv)} pp{straddlesZero(queuesOnly.left.lo, queuesOnly.left.hi) ? ': no clear difference' : ''}{queuesOnly.peakUtilPct.lo > 0 ? `; reservation would still cost ${num(queuesOnly.peakUtilPct.adv, 1)} pp of peak seat use` : ''}. How arriving groups judge a canteen with reserved tables is the assumption this result rests on most.</li>}
+        {queuesOnly && base && <li><b>How much comes from the view at the door.</b> If arriving groups judged only the queues, not the seating, the gap in leaving would be {sgn(queuesOnly.left.adv)} pp{bracket(queuesOnly.left.lo, queuesOnly.left.hi, 1)} instead of {sgn(base.left.adv)} pp{straddlesZero(queuesOnly.left.lo, queuesOnly.left.hi) ? ': no clear difference' : ''}{queuesOnly.peakUtilPct.lo > 0 ? `; reservation would still cost ${num(queuesOnly.peakUtilPct.adv, 1)} pp of peak seat use` : ''}. How groups judge the hall is a key assumption. The broader study above also tests search visibility and combinations of rules.</li>}
         {rf && <li><b>{rfClosest ? 'Relative to free flow’s own leaving, reservation comes closest with the Reservation-friendly settings:' : 'The Reservation-friendly settings:'}</b> mostly big groups ({list(mix.map((x, i) => `${Math.round((100 * x) / mixSum)}% ${sizes[i]}`))}), stalls at {num(rfCfg.stalls.serviceMean, 0)} seconds per person and equally popular, slower tray walking and {num(rfCfg.search.visibility, 0)} m visibility. Leaving rises from {num(rf.left.b, 1)}% to {num(rf.left.a, 1)}%, and reservation wins {rf.left.L} of {m.n} lunches.</li>}
       </ul>
     </Section>
@@ -504,7 +506,7 @@ function Limits({ m, onScreenIsLunch1 }: { m: FindingsModel; onScreenIsLunch1: b
       <ul class="fbullets">
         <li><b>This is a model, not a measurement.</b> Each group's patience is drawn, not measured; a group judges the queues and the whole hall at a glance; one member searches for a table; nobody waits beside diners who are about to leave; strangers never move a reservation object; and nobody reserves before arriving. Some rules favour reservation (groups circle {num(CFG.search.splitAfter / 60, 0)} minutes before splitting; groupmates with food wait at their stall), others favour free flow (shortest routes; searchers see every table within {num(CFG.search.visibility, 0)} m; a table with an object looks fully taken from the door). <button type="button" class="linklike" onClick={() => openDrawer('assumptions')}>See all assumptions</button></li>
         <li><b>The study set out to test a belief that free flow is better.</b> To guard against that bias, reservation's real benefit is modelled (a group with a claimed table always has a seat waiting and walks straight to it with food), the headline measures were fixed before any results were seen, and one set of settings is built to favour reservation. The rules changed once, when the owner pointed out that food comes on plates that cannot be taken away (model 2); the new rules, settings and headline measures were written down, and a check of free flow alone passed, before any comparison was run. The rules still deserve checking against a real canteen.</li>
-        <li><b>The 95% ranges cover chance only.</b> The panel and the export allow about {m.comparisons} such comparisons (the batch charts alone show {m.chartIntervals}); among so many, a few could look real by chance. This does not touch the main result: 100% against 0% on the four headline measures was chosen in advance{m.allFourAt100 ? `, and free flow won all four in all ${m.n} lunches` : ''}.</li>
+        <li><b>The 95% ranges cover chance only.</b> The original figures and export allow about {m.comparisons} such comparisons (the batch charts alone show {m.chartIntervals}), with further exploratory comparisons in the sensitivity study above; among so many, a few could look real by chance. The original comparison of 100% against 0% on the four headline measures was chosen in advance{m.allFourAt100 ? `, and free flow won all four in all ${m.n} lunches at the defaults` : ''}. That does not establish the accuracy of the behaviour rules.</li>
         <li><b>Single lunches are noisy.</b> {onScreenIsLunch1 ? 'The lunch the app plays on screen' : 'Lunch 1 of the evidence (the one the app plays with the default settings and seed)'} has free-flow leaving of {num(m.lunch1.leftB, 1)}%, the {ordinal(m.lunch1.rank)} highest of {m.n}. There, 50% reserving adds {num(m.lunch1.gap50, 1)} pp, against {num(m.lunch1.meanGap50, 1)} pp on average. In {m.lunches100BelowAt75} of the {m.n} lunches, 100% reserving had fewer people leaving than 75%.</li>
         <li><b>Someone who leaves is a lost meal, not only a lost seat.</b> Food cannot be taken away, so nobody who leaves buys anything.</li>
       </ul>
@@ -544,6 +546,12 @@ export function FindingsPanel() {
         {!settingsMatch && <>Your current settings differ from the defaults, so your lunches may behave differently. <button type="button" class="linklike" onClick={() => openDrawer('batch')}>Test your settings in Batch runs</button></>}
       </p>
       {stale && <p class="warn-text">These findings were computed for another model version and may be out of date.</p>}
+      <nav class="sensitivity-actions findings-nav" aria-label="Findings sections">
+        {([['f-sensitivity', 'Explore assumptions'], ['f-research', 'Investigate visibility'], ['f-short', 'Read default results']] as const).map(([id, label]) =>
+          <button type="button" key={id} onClick={() => { const target = document.getElementById(id); target?.focus({ preventScroll: true }); target?.scrollIntoView({ block: 'start' }); }}>{label}</button>)}
+      </nav>
+      <SensitivityExplorer />
+      <ResearchExplorer />
       <InShort m={m} />
       <HowItWorks m={m} />
       <Headline m={m} />

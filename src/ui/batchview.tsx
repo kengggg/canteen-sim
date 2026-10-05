@@ -12,7 +12,7 @@ import { MODEL_VERSION } from '../sim/version';
 import { batch, cancelBatch, perRunMs, startBatch, workerCount } from './batchrun';
 import { diffChart } from './charts';
 import { canDownload, saveText } from './download';
-import { EVIDENCE, evidenceBatch } from './evidence';
+import { EVIDENCE, evidenceBatch, hasDefaultSettings } from './evidence';
 import { num } from './format';
 import { CHART_CAPTION, MSG } from './labels';
 import { LoadReadout } from './settings';
@@ -220,7 +220,7 @@ function Results({ r, precomputed, cfg }: { r: BatchResult; precomputed: boolean
 export function BatchPanel() {
   const b = batch.value;
   const cfg = applied.value;
-  const isDefault = JSON.stringify({ ...cfg, seed: 1 }) === JSON.stringify(defaultConfig()) && cfg.seed === 1;
+  const isDefault = hasDefaultSettings(cfg);
   const [kind, setKind] = useState<'reservation' | 'sensitivity'>('reservation');
   const [n, setN] = useState(30);
   const [setting, setSettingId] = useState('stalls.serviceMean');

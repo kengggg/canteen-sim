@@ -12,6 +12,8 @@
     "bench": "vite-node scripts/bench.ts",
     "precompute": "vite-node scripts/precompute.ts",
     "findings": "vite-node scripts/findings.ts",
+    "sensitivity": "vite-node scripts/sensitivity.ts",
+    "research": "vite-node scripts/research.ts",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview --port 4173 --strictPort",

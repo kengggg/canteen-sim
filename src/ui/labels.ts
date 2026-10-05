@@ -15,7 +15,7 @@ export const CLASS_LABELS = [
 export const CLASS_HELP = [
   'A group member looking for an empty table to reserve, or placing the object on it.',
   'At a stall: walking to a queue place, queuing, being served, or waiting because every queue is full.',
-  'Carrying food and looking for a table where the whole group fits.',
+  'Carrying food and looking for seats. After circling, the group may split across tables.',
   'Seated while groupmates are still on their way.',
   'Seated: eating, waiting for groupmates to finish, or lingering.',
   'Left before getting food: at the door, or after queuing too long. Plates can’t be taken away, so nobody leaves holding food.',

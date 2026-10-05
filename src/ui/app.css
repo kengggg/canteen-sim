@@ -105,6 +105,7 @@ fieldset.plain {
   align-items: center;
 }
 .evidence-line {
+  margin: 0;
   text-align: left;
   border: none;
   background: var(--panel-2);
@@ -113,6 +114,70 @@ fieldset.plain {
   font-size: var(--fs-1);
   color: var(--ink);
 }
+
+/* ---------------------------------------------------------------- guided opening */
+.sensitivity-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+.sensitivity-controls label { display: flex; flex-direction: column; gap: 5px; min-width: 0; flex: 1 1 200px; }
+.sensitivity-controls select { height: 44px; min-height: 44px; width: 100%; }
+.sensitivity-cases button { min-height: 44px; width: 100%; text-align: left; }
+.sensitivity-detail { background: var(--panel-2); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; margin: 14px 0; }
+.sensitivity-detail h4 { margin: 0; font-size: var(--fs-2); }
+.sensitivity-detail > button, .sensitivity-actions button { min-height: 44px; }
+.sensitivity details { margin-top: 12px; }
+.sensitivity summary { cursor: pointer; padding: 10px 0; min-height: 44px; }
+.sensitivity-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.research-label { font-weight: 600; color: var(--accent); }
+.table-hint { display: none; }
+@media (max-width: 600px) { .table-hint { display: block; } }
+.story-wrap { padding: 16px; }
+.story {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  grid-template-areas: 'intro experiment' 'explanation experiment';
+  gap: 20px 40px;
+  padding: clamp(20px, 3vw, 40px);
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.story-intro { grid-area: intro; }
+.story-intro .eyebrow { margin: 0 0 12px; }
+.story-intro h1 { font-size: clamp(26px, 3vw, 38px); line-height: 1.15; max-width: 23ch; }
+.story-intro > p:not(.eyebrow) { font-size: var(--fs-3); max-width: 55ch; }
+.story-explanation { grid-area: explanation; }
+.story-explanation h2 { font-size: var(--fs-3); }
+.story-explanation > p { max-width: 60ch; }
+.story-limit { border-left: 3px solid var(--accent); padding-left: 12px; }
+.story-experiment {
+  grid-area: experiment;
+  align-self: start;
+  min-width: 0;
+  background: var(--panel-2);
+  border-radius: var(--radius);
+  padding: 24px;
+}
+.story-choices { border: 0; padding: 0; margin: 0 0 22px; min-width: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.story-choices legend { font-weight: 650; padding: 0 0 10px; }
+.story-choices label { display: flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.story-choices label:has(input:checked) { border-color: var(--accent); background: var(--panel); }
+.story-choices input { accent-color: var(--accent); }
+.story-measure { margin: 0 0 14px; }
+.story-numbers { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+.story-numbers > div { padding-left: 12px; border-left: 3px solid var(--b); }
+.story-numbers > div + div { border-color: var(--a); }
+.story-numbers dt { font-weight: 600; }
+.story-numbers dd { margin: 4px 0 0; font-size: clamp(32px, 4vw, 48px); line-height: 1.15; font-weight: 700; }
+.story-numbers span { font-size: var(--fs-1); color: var(--muted); }
+.story-takeaway { font-size: var(--fs-4); font-weight: 650; line-height: 1.3; margin: 24px 0 12px; }
+.story-detail { margin: 0 0 16px; }
+.story-uncertainty summary { cursor: pointer; text-decoration: underline; text-underline-offset: 3px; }
+.story-uncertainty p { color: var(--muted); }
+.story-source { color: var(--muted); font-size: var(--fs-0); margin: 18px 0 0; }
+.story-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.story button { min-height: 44px; }
+.story-reset { font-size: var(--fs-0); margin-bottom: 0; }
+#simulation { scroll-margin-top: calc(var(--topbar-h, 100px) + 12px); }
+#simulation:focus { outline: none; }
 
 /* ---------------------------------------------------------------- banners */
 .banners {
@@ -519,7 +584,7 @@ table.data caption {
 
 /* ---------------------------------------------------------------- findings panel (spec §11.13) */
 .drawer.drawer-findings {
-  width: min(880px, 100vw);
+  width: min(880px, 100%);
 }
 .findings {
   display: flex;
@@ -585,6 +650,7 @@ table.data caption {
 .findings code {
   font-family: var(--mono);
   font-size: 0.92em;
+  overflow-wrap: anywhere;
 }
 .findings table.data th[scope='row'] {
   font-weight: 500;
@@ -696,10 +762,11 @@ table.data caption {
 /* ---------------------------------------------------------------- drawers and overlays */
 .drawer {
   position: fixed;
+  box-sizing: border-box;
   top: calc(var(--topbar-h, 0px) + env(safe-area-inset-top, 0px));
   right: 0;
   bottom: 0;
-  width: min(560px, 100vw);
+  width: min(560px, 100%);
   background: var(--panel);
   border-left: 1px solid var(--line);
   box-shadow: -12px 0 32px rgb(0 0 0 / 0.12);
@@ -708,7 +775,7 @@ table.data caption {
   flex-direction: column;
 }
 .drawer-batch {
-  width: min(980px, 100vw);
+  width: min(980px, 100%);
 }
 .drawer-head {
   display: flex;
@@ -990,15 +1057,18 @@ table.data caption {
   font-size: var(--fs-1);
 }
 .progress-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
-  flex-wrap: wrap;
 }
 .progress-row progress {
-  flex: 1;
-  min-width: 160px;
+  grid-column: 1;
+  width: 100%;
+  min-width: 0;
 }
+.progress-row > span { grid-column: 1; grid-row: 2; }
+.progress-row > button { grid-column: 2; grid-row: 1 / span 2; align-self: start; min-height: 44px; }
 .precomputed {
   background: var(--panel-2);
   border-left: 3px solid var(--accent);
@@ -1073,6 +1143,15 @@ table.data caption {
 
 /* ---------------------------------------------------------------- narrow screens (< 900 px) */
 @media (max-width: 899px) {
+  .story {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: 'intro' 'experiment' 'explanation';
+    gap: 24px;
+    padding: 20px;
+  }
+  .story-experiment { padding: 16px; }
+  .story-choices { flex-direction: column; }
+  .story-numbers dt { min-height: 2.9em; }
   .stage {
     grid-template-columns: 1fr;
   }

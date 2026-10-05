@@ -3,7 +3,7 @@ import { FindingsPanel } from './findings';
 import { BatchPanel } from './batchview';
 import { SettingsPanel } from './settings';
 import { batch } from './batchrun';
-import { drawer } from './store';
+import { closeDrawer, drawer } from './store';
 
 const TITLES = { settings: 'Settings', assumptions: 'Assumptions', batch: 'Batch runs', findings: 'Findings' } as const;
 
@@ -17,7 +17,7 @@ export function Drawers() {
     <aside key={d} class={`drawer drawer-${d}`} aria-label={TITLES[d]}>
       <header class="drawer-head">
         <h2 tabIndex={-1}>{TITLES[d]}</h2>
-        <button type="button" aria-label="Close" onClick={() => (drawer.value = null)}>×</button>
+        <button type="button" aria-label="Close" onClick={closeDrawer}>×</button>
       </header>
       <div class="drawer-body">
         {readOnly && <p class="muted">A batch is running; settings are read-only until it finishes.</p>}

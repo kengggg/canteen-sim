@@ -74,6 +74,8 @@ export interface EngineOpts {
   trace?: (event: string, a: number, b: number, c: number) => void;
   /** With __SIM_INVARIANTS__, check invariants after every n-th event (default 1000) and at the end. */
   invariantEvery?: number;
+  /** Research-only intervention; never encoded in Model 2 settings or enabled by createEngine(). */
+  researchVisibility?: { version: 'visibility-roles-v1'; claimer: number; foodSearcher: number };
 }
 
 /** A party record with every field at its initial value. */
@@ -98,6 +100,8 @@ export class World {
   readonly seed: number;
   readonly fraction: number;
   readonly pc: Precomp;
+  readonly claimObservation: Precomp;
+  readonly foodObservation: Precomp;
   readonly pop: Population;
   readonly q = new EventQueue(4096);
   readonly mv: Movement;
@@ -229,6 +233,12 @@ export class World {
     this.trace = opts.trace;
     const lp = toLayoutParams(cfg);
     this.pc = getPrecomp(lp, Math.round(cfg.search.visibility * 1000));
+    const research = opts.researchVisibility;
+    if (research && (research.version !== 'visibility-roles-v1' || [research.claimer, research.foodSearcher].some((v) => !Number.isFinite(v) || v <= 0 || v > 100))) {
+      throw new Error('Invalid research visibility variant');
+    }
+    this.claimObservation = research ? getPrecomp(lp, Math.round(research.claimer * 1000)) : this.pc;
+    this.foodObservation = research ? getPrecomp(lp, Math.round(research.foodSearcher * 1000)) : this.pc;
     this.pop = buildPopulation(cfg, this.seed);
     this.T = (cfg.crowd.windowEnd - cfg.crowd.windowStart) * 60_000;
     this.simEnd = this.T + EXTRA_MS;

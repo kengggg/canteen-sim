@@ -14,6 +14,18 @@ const axis = () => ({
   font: `12px ${token('--font') || 'system-ui'}`,
 });
 
+/** Resize existing plots when their container changes, including while playback is paused. */
+function responsiveChart(el: HTMLElement, opts: uPlot.Options, data: uPlot.AlignedData): uPlot {
+  const chart = new uPlot(opts, data, el);
+  const observer = new ResizeObserver(() => {
+    const width = Math.max(1, el.clientWidth);
+    if (chart.width !== width) chart.setSize({ width, height: chart.height });
+  });
+  observer.observe(el);
+  (chart.hooks.destroy ??= []).push(() => observer.disconnect());
+  return chart;
+}
+
 /**
  * Stacked seat-state areas (spec §7.6): series drawn from the top of the stack down so each fill covers the one below.
  * `layers[k][i]` is the mean seat count of state k in minute i (bottom layer first).
@@ -45,7 +57,7 @@ export function stackedChart(el: HTMLElement, x: number[], layers: number[][], c
         }
       : {},
   };
-  return new uPlot(opts, [x, ...order.map((k) => cum[k])], el);
+  return responsiveChart(el, opts, [x, ...order.map((k) => cum[k])]);
 }
 
 /** Mean paired difference per level with its 95% CI band (spec §10.3 charts). */
@@ -68,5 +80,5 @@ export function diffChart(el: HTMLElement, x: number[], mean: (number | null)[],
     bands: [{ series: [1, 2], fill: `${accent}33` }],
   };
   const zero = x.map(() => 0);
-  return new uPlot(opts, [x, hi as number[], lo as number[], mean as number[], zero], el);
+  return responsiveChart(el, opts, [x, hi as number[], lo as number[], mean as number[], zero]);
 }

@@ -231,7 +231,7 @@ export function groupArrive(w: World, g: number): void {
     // before the claimer takes a step.
     const mem = G.mem!;
     if (w.pc.G.nodes[entrance].intersection) mem.visit(entrance, w.now);
-    observe(mem, w.pc, entrance, w.now, truthOf(w));
+    observe(mem, w.claimObservation, entrance, w.now, truthOf(w));
     const tgt = claimTarget(mem, w.pc, entrance, G.size, (a) => sumDist(w, G, a));
     if (!tgt) {
       fallback(w, G, 1);
@@ -383,7 +383,7 @@ function claimObserve(w: World, p: number, n: number): void {
   const G = w.groupOf(p);
   const mem = G.mem!;
   if (w.pc.G.nodes[n].intersection) mem.visit(n, w.now);
-  observe(mem, w.pc, n, w.now, truthOf(w));
+  observe(mem, w.claimObservation, n, w.now, truthOf(w));
   claimStep(w, p);
 }
 
@@ -640,7 +640,7 @@ function freeSearchAt(w: World, p: number, n: number): void {
   const G = w.groupOf(p);
   const mem = G.mem!;
   if (w.pc.G.nodes[n].intersection) mem.visit(n, w.now);
-  observe(mem, w.pc, n, w.now, truthOf(w));
+  observe(mem, w.foodObservation, n, w.now, truthOf(w));
   searchStep(w, p);
 }
 

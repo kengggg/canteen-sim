@@ -3,11 +3,12 @@ import { PRESETS } from '../config/presets';
 import { cloneConfig } from '../config/meta';
 import { defaultConfig } from '../config/schema';
 import { SPEEDS } from './controller';
-import { evidenceSentence } from './evidence';
-import { clock, parseClock } from './format';
+import { hasDefaultSettings } from './evidence';
+import { comparisonEstimate } from './story-model';
+import { clock, num, parseClock } from './format';
 import { APP_TITLE, ARIA, MSG } from './labels';
 import {
-  applied, batchRunning, controller, drawer, evidenceOpen, howto, openDrawer, pending, playing, restart, skipProgress, speed, theme, tick,
+  applied, batchRunning, controller, drawer, evidenceOpen, howto, openDrawer, pending, playing, restart, skipProgress, speed, theme, tick, toggleDrawer,
 } from './store';
 
 export function togglePlay(): void {
@@ -52,12 +53,12 @@ const THEME_NEXT = { system: 'light', light: 'dark', dark: 'system' } as const;
 export function TopBar() {
   void tick.value;
   const cfg = applied.value;
-  const isDefault = JSON.stringify({ ...cfg, seed: 1 }) === JSON.stringify(defaultConfig()) && cfg.seed === 1;
-  const evidence = isDefault ? evidenceSentence() : null;
+  const evidence = comparisonEstimate(cfg);
+  const fraction = Math.round(cfg.reserve.percentA * 100);
   return (
     <header class="topbar">
       <div class="topbar-row">
-        <h1 class="brand">{APP_TITLE}</h1>
+        <h2 class="brand">{APP_TITLE}</h2>
         <label class="preset" for="preset">
           <span class="sr-only">Scenario</span>
           <select
@@ -92,19 +93,20 @@ export function TopBar() {
           <Skip />
         </div>
         <nav class="tools" aria-label="Panels">
-          <button type="button" onClick={() => (drawer.value === 'findings' ? (drawer.value = null) : openDrawer('findings'))} aria-pressed={drawer.value === 'findings'}>Findings</button>
-          <button type="button" onClick={() => (drawer.value = drawer.value === 'assumptions' ? null : 'assumptions')} aria-pressed={drawer.value === 'assumptions'}>Assumptions</button>
-          <button type="button" aria-label={ARIA.settings} title={ARIA.settings} onClick={() => (drawer.value = drawer.value === 'settings' ? null : 'settings')} aria-pressed={drawer.value === 'settings'}>⚙</button>
-          <button type="button" aria-label={ARIA.batch} title={ARIA.batch} onClick={() => (drawer.value = drawer.value === 'batch' ? null : 'batch')} aria-pressed={drawer.value === 'batch'}>📊</button>
+          <button type="button" onClick={() => toggleDrawer('findings')} aria-pressed={drawer.value === 'findings'}>Findings</button>
+          <button type="button" onClick={() => toggleDrawer('assumptions')} aria-pressed={drawer.value === 'assumptions'}>Assumptions</button>
+          <button type="button" aria-label={ARIA.settings} title={ARIA.settings} onClick={() => toggleDrawer('settings')} aria-pressed={drawer.value === 'settings'}>⚙</button>
+          <button type="button" aria-label={ARIA.batch} title={ARIA.batch} onClick={() => toggleDrawer('batch')} aria-pressed={drawer.value === 'batch'}>📊</button>
           <button type="button" aria-label={ARIA.howto} title={ARIA.howto} onClick={() => (howto.value = true)}>?</button>
           <button type="button" aria-label={`${ARIA.theme}: ${theme.value}`} title={`Theme: ${theme.value}`} onClick={() => (theme.value = THEME_NEXT[theme.value])}>◐</button>
         </nav>
       </div>
-      {evidence && (
-        <button type="button" class="evidence-line" onClick={() => { evidenceOpen.value = true; drawer.value = 'batch'; }}>
-          <span class="eyebrow">Evidence (30 lunches)</span> {evidence}
-        </button>
-      )}
+      <p class="evidence-line">
+        {evidence
+          ? <><b>{evidence.n}-lunch model estimate · {fraction}% reserving:</b> {num(evidence.left.a, 1)}% left without eating in A, {num(evidence.left.b, 1)}% in B. </>
+          : <><b>Live comparison · {fraction}% reserving:</b> {fraction === 0 ? 'Both canteens use free flow. ' : 'No built-in estimate for these settings. '}</>}
+        <button type="button" class="linklike" onClick={() => { evidenceOpen.value = hasDefaultSettings(cfg); openDrawer('batch'); }}>Compare lunches</button>
+      </p>
     </header>
   );
 }

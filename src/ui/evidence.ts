@@ -1,8 +1,7 @@
-import { METRIC_BY_ID } from '../batch/catalog';
 import { decodeEvidence, type Evidence } from '../batch/precompute';
 import type { BatchResult } from '../batch/runner';
-import { sentence } from '../batch/wording';
 import evidenceJson from '../generated/evidence.json';
+import { defaultConfig, type Config } from '../config/schema';
 
 /** The precomputed default evidence shipped with the page (spec §10.8), decoded on first use. */
 export const EVIDENCE = evidenceJson as unknown as Evidence;
@@ -13,9 +12,8 @@ export function evidenceBatch(): BatchResult {
   return decoded;
 }
 
-/** The P1 sentence at 100% vs 0% for the top-bar Evidence line. */
-export function evidenceSentence(): string {
-  const b = evidenceBatch();
-  const s = b.stats.find((x) => x.metricId === 'leftPct' && x.fraction === 1);
-  return s ? sentence(METRIC_BY_ID.get('leftPct')!, 1, s.adv, s.wins) : '';
+/** Match the built-in sweep's settings independently of the one live seed and selected reservation level. */
+export function hasDefaultSettings(cfg: Config): boolean {
+  const base = defaultConfig();
+  return JSON.stringify({ ...cfg, seed: base.seed, reserve: { ...cfg.reserve, percentA: base.reserve.percentA } }) === JSON.stringify(base);
 }

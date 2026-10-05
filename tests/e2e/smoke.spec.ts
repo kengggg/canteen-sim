@@ -20,11 +20,14 @@ async function dismissHowTo(page: Page) {
   void page;
 }
 
-test('the How this works panel shows on the first visit only', async ({ browser }) => {
+test('the first visit shows the guided story; How this works remains available on demand', async ({ browser }) => {
   const ctx = await browser.newContext();
   const page = await ctx.newPage();
   await page.goto('/');
   const dialog = page.getByRole('dialog', { name: 'How this works' });
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Does saving a table help everyone get lunch?' })).toBeVisible();
+  await page.getByRole('button', { name: 'How this works' }).click();
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(dialog).toHaveCount(0);

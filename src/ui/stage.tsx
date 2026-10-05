@@ -147,7 +147,7 @@ export function Stage() {
   }, [themeGen.value]);
 
   return (
-    <section class="stage" aria-label="Canteens">
+    <section class="stage" id="simulation" tabIndex={-1} aria-label="Canteens">
       <ViewControls />
       <canvas ref={canvasRef} class="stage-canvas" aria-hidden="true" />
       <Pane side={0} />

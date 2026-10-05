@@ -15,7 +15,7 @@ test('C1: inside sandbox="allow-scripts", Skip to, Load settings code and Run ba
   await page.setViewportSize({ width: 1320, height: 980 });
   await page.goto('/sandbox.html');
   const f = page.frameLocator('#f');
-  await f.getByRole('dialog', { name: 'How this works' }).getByRole('button', { name: 'Close' }).click();
+  await expect(f.getByRole('dialog', { name: 'How this works' })).toHaveCount(0);
   await f.locator('#skip-to').fill('11:20');
   await f.getByRole('button', { name: 'Skip to' }).click();
   await expect(f.locator('.clock')).toHaveText('11:20', { timeout: 60_000 });
@@ -58,6 +58,7 @@ test('I4: releasing the A slider never starts a blocked configuration', async ({
 
 test('I5: a slow drag orbits as far as a fast one', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Jump to the simulator' }).click();
   const box = (await page.locator('.viewport').first().boundingBox())!;
   const yaw = () => page.evaluate(() => (window as unknown as { __canteen: Hook }).__canteen.renderer()!.yaw);
   const drag = async (delayMs: number) => {
@@ -99,6 +100,7 @@ test('I7: a touch tap shows the hover card', async ({ browser }) => {
   await page.locator('#skip-to').fill('12:10');
   await page.getByRole('button', { name: 'Skip to' }).click();
   await expect(page.locator('.clock')).toHaveText('12:10', { timeout: 60_000 });
+  await page.getByRole('button', { name: 'Jump to the simulator' }).click();
   const box = (await page.locator('.viewport').first().boundingBox())!;
   let shown = false;
   for (let i = 0; i < 30 && !shown; i++) {
@@ -111,6 +113,7 @@ test('I7: a touch tap shows the hover card', async ({ browser }) => {
 
 test('I8: a host data-theme change recolours the 3D scene; I9: the free-seat count keeps 4.5:1 contrast in dark', async ({ page }) => {
   await page.goto('/');
+  await page.getByRole('button', { name: 'Jump to the simulator' }).click();
   const box = (await page.locator('.viewport').first().boundingBox())!;
   const pixel = async () => {
     const shot = await page.screenshot({ clip: { x: box.x + 4, y: box.y + 4, width: 1, height: 1 } });

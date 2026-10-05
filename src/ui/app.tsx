@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { MODEL_VERSION } from '../sim/version';
 import { MSG } from './labels';
 import { Stage } from './stage';
-import { applied, controller, dirty, drawer, howto, notices, openDrawer, restart, theme, themeGen, tick } from './store';
+import { applied, closeDrawer, controller, dirty, drawer, howto, notices, openDrawer, restart, theme, themeGen, tick } from './store';
 import { TopBar, togglePlay } from './topbar';
 import { copyText } from './store';
 import { LiveStats } from './livestats';
@@ -11,6 +11,7 @@ import { Drawers } from './drawers';
 import { EndCard } from './endcard';
 import { HowTo } from './howto';
 import { HoverCard } from './hovercard';
+import { Story } from './story';
 
 const HOST_THEME = document.documentElement.getAttribute('data-theme');
 
@@ -51,13 +52,16 @@ function Banners() {
 export function App() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
+      const t = e.target as HTMLElement;
       if (e.key === 'Escape') {
+        // A native select owns Escape when dismissing its popup.
+        if (t.closest('select')) return;
         if (howto.value) howto.value = false;
-        else if (drawer.value) drawer.value = null;
+        else if (drawer.value) closeDrawer();
         return;
       }
       if (e.code !== 'Space' || howto.value) return;
-      const t = e.target as HTMLElement;
       // Space keeps its normal meaning on text fields and on buttons, links and other activatable controls.
       if (t.closest('input, textarea, select, button, a, summary, [role="button"], [contenteditable="true"]')) return;
       e.preventDefault();
@@ -82,12 +86,22 @@ export function App() {
     // Drawers open below the top bar so its buttons stay reachable; the bar's height changes as it wraps.
     const bar = document.querySelector<HTMLElement>('.topbar');
     if (!bar) return;
-    const set = () => document.documentElement.style.setProperty('--topbar-h', `${bar.getBoundingClientRect().height}px`);
+    const set = () => {
+      document.documentElement.style.setProperty('--topbar-h', `${bar.getBoundingClientRect().height}px`);
+      // A narrower story changes the toolbar's position even while a fixed drawer is open.
+      if (drawer.value && bar.getBoundingClientRect().top > 0) bar.scrollIntoView({ block: 'start' });
+    };
     set();
     const ro = new ResizeObserver(set);
     ro.observe(bar);
     return () => ro.disconnect();
   }, []);
+  useEffect(() => {
+    if (!drawer.value) return;
+    const bar = document.querySelector<HTMLElement>('.topbar');
+    // A link in the opening story can open a panel before the simulator toolbar has reached the viewport.
+    if (bar && bar.getBoundingClientRect().top > 0) bar.scrollIntoView({ block: 'start' });
+  }, [drawer.value]);
   useEffect(() => {
     // One theme generation for the renderer and charts: our toggle, the host's data-theme, or the OS scheme.
     const bump = () => { themeGen.value++; };
@@ -108,12 +122,15 @@ export function App() {
   void applied.value;
   return (
     <>
-      <TopBar />
-      <Banners />
-      <main class="main">
-        <Stage />
-        <LiveStats />
-        <BottomStrip />
+      <main>
+        <div class="story-wrap"><Story /></div>
+        <TopBar />
+        <Banners />
+        <div class="main">
+          <Stage />
+          <LiveStats />
+          <BottomStrip />
+        </div>
       </main>
       <Drawers />
       <EndCard />
