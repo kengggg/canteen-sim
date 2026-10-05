@@ -11,6 +11,10 @@ export function selfContainedProblems(html: string, budgetBytes: number): string
   for (const m of markup.matchAll(/<script\b[^>]*\bsrc\s*=\s*["']?([^"'\s>]+)/gi)) problems.push(`external script src=${m[1]}`);
   for (const m of markup.matchAll(/<link\b[^>]*>/gi)) {
     const href = /\bhref\s*=\s*["']?([^"'\s>]+)/i.exec(m[0])?.[1];
+    // A canonical URL is metadata, not a request. Only allow that exact relation: a link with
+    // additional preload/stylesheet relations must still be rejected by the offline contract.
+    const rel = /\srel\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(m[0]);
+    if ((rel?.[1] ?? rel?.[2] ?? rel?.[3] ?? '').trim().toLowerCase() === 'canonical') continue;
     if (href && !/^(data|blob):/i.test(href)) problems.push(`${/stylesheet/i.test(m[0]) ? 'external stylesheet' : 'linked resource'} ${href}`);
   }
   for (const m of markup.matchAll(/<(img|source|video|audio|iframe|embed|object)\b[^>]*\b(?:src|data|poster)\s*=\s*["']?([^"'\s>]+)/gi)) {

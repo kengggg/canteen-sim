@@ -14,3 +14,10 @@ test('a self-contained page passes; external scripts, styles, images and fetches
 test('the size budget is enforced', () => {
   expect(selfContainedProblems('<html></html>'.padEnd(2000, ' '), 1000).join(' ')).toMatch(/budget/);
 });
+
+test('canonical metadata is allowed while resource hints and mixed relations remain rejected', () => {
+  expect(selfContainedProblems('<link rel="canonical" href="https://labs.patipat.org/canteen/">', 2000)).toEqual([]);
+  for (const rel of ['stylesheet', 'preload', 'prefetch', 'canonical preload', 'canonical stylesheet']) {
+    expect(selfContainedProblems(`<link rel="${rel}" href="https://cdn.example/asset">`, 2000)).not.toEqual([]);
+  }
+});

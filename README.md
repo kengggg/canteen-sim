@@ -116,7 +116,7 @@ same model version and press **Restart**: every event, and therefore every hash 
 Chromium, Firefox and WebKit, on the main thread and in workers. Batch results add the number of lunches; batch seeds
 are derived from the live seed (spec §10.1).
 
-## Host on GitHub Pages (canteen.lab.patipat.org)
+## Host on Cloudflare Workers (labs.patipat.org/canteen/)
 
 The whole sim is one plain HTML file: code, styles, the batch worker and the precomputed evidence are all inside
 `dist/index.html`, and it makes no network requests. Any static host works, and so does opening the file from disk.
@@ -126,25 +126,31 @@ cover copied to `dist/og/` during builds. The page's Open Graph and large-image 
 domain. Publish that image alongside the HTML for link previews; the offline simulator itself does not load it.
 The original artwork, generation prompt and export details are recorded in [`docs/og-image.md`](docs/og-image.md).
 
-The site is https://canteen.lab.patipat.org, deployed by [`.github/workflows/pages.yml`](.github/workflows/pages.yml)
+The production destination is https://labs.patipat.org/canteen/, deployed by [`.github/workflows/cloudflare.yml`](.github/workflows/cloudflare.yml)
 on every push to `main` after lint, type checks, unit/sanity tests, browser regressions and the single-file build pass.
 [`ci.yml`](.github/workflows/ci.yml) runs the same checks on every pull request. Chromium covers the complete browser
 suite; Firefox and WebKit cover determinism, the guided opening, sensitivity, research and localisation flows. On macOS builds
 where Playwright Firefox reports “Could not find profile folder”, `CANTEEN_E2E_FIREFOX=0` skips it explicitly; this
 does not verify Firefox. CI on Linux keeps Firefox enabled.
 
+`npm run build:cloudflare` retains the offline `dist/index.html` and packages the HTML and image under
+`dist-cloudflare/canteen/`. The independent `patipat-canteen` Worker serves these files. The
+[`kengggg/labs`](https://github.com/kengggg/labs) repository owns the English-language Patipat Labs directory and its
+`patipat-labs` gateway Worker, which forwards `/canteen/*` through a service binding. Canteen keeps its Thai default and
+English option. Updating this repository deploys only Canteen.
+
 **One-time setup**
 
-1. The repository is public: GitHub Pages on a private repository needs GitHub Pro, Team or Enterprise.
-2. **Settings → Pages → Build and deployment → Source: GitHub Actions**, and **Custom domain:
-   `canteen.lab.patipat.org`**. Add the custom domain here *before* the DNS record, so no other Pages site can claim
-   the name.
-3. `patipat.org`'s DNS is at Cloudflare. Add a record there: type **CNAME**, name **`canteen.lab`**, target
-   **`kengggg.github.io`**, proxy status **DNS only** (grey cloud). A proxied record would fail: Cloudflare's free
-   certificate covers only one level of subdomain (`*.patipat.org`). With DNS only, GitHub issues the certificate.
-4. Once GitHub shows the certificate, tick **Enforce HTTPS**.
-5. Optional: verify `patipat.org` under your GitHub account's **Settings → Pages → Verified domains** (one TXT record at
-   Cloudflare), so no other account's Pages site can use its subdomains.
+1. Set GitHub repository variable `CLOUDFLARE_ACCOUNT_ID` and secret `CLOUDFLARE_API_TOKEN` for the intended account.
+   Use an API token scoped to the Worker deployment permissions that are needed; never commit credentials.
+2. Deploy `patipat-canteen` before the Labs gateway. It has no public `workers.dev` address or custom domain of its own.
+3. Deploy the `patipat-labs` gateway in the same account with its `CANTEEN` service binding and
+   `labs.patipat.org` custom domain. Cloudflare provisions the new DNS record and HTTPS certificate.
+4. Verify the live simulator, sharing image, query/hash links, language switch, downloads and worker batches.
+5. Only after verification, remove the old `canteen.lab` DNS record and disable its GitHub Pages site. The former
+   `canteen.lab.patipat.org` address is retired without a redirect.
+
+See [`docs/labs-migration.md`](docs/labs-migration.md) for the rollout, validation and retirement order.
 
 Notes:
 

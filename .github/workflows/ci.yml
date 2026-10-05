@@ -1,5 +1,5 @@
 # Checks every pull request, including model invariants and browser regressions.
-# Pushes to main run the same checks in the Pages workflow before it deploys.
+# Pushes to main run the same checks in the Cloudflare workflow before it deploys.
 name: CI
 
 on:
@@ -24,4 +24,5 @@ jobs:
       - run: npm run test:sanity
       - run: npx playwright install --with-deps chromium firefox webkit
       - run: npm run test:e2e
-      - run: npm run build:pages
+      - run: npm run build:cloudflare
+      - run: npx wrangler deploy --dry-run
